@@ -1,0 +1,107 @@
+{
+  "projectType": "saas",
+  "projectName": "Bethlemitas Student Support System",
+  "projectDescription": "A comprehensive student referral and psychological support management system for educational institutions.",
+  "theme": "linden",
+  "primaryColor": "#040404",
+  "lightColor": "#ef370f",
+  "darkColor": "#f79d72",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "configuration"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/student-referrals",
+              "features/psycho-orientation",
+              "features/user-management",
+              "features/academic-structure",
+              "features/piar-dua-management"
+            ]
+          },
+          {
+            "group": "User Roles",
+            "pages": [
+              "roles/coordinator",
+              "roles/teacher",
+              "roles/psychologist"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/creating-referrals",
+              "guides/managing-students",
+              "guides/reports-and-tracking",
+              "guides/authentication"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Models",
+            "pages": [
+              "api/models/student",
+              "api/models/teacher",
+              "api/models/referral",
+              "api/models/psychoorientation"
+            ]
+          },
+          {
+            "group": "Controllers",
+            "pages": [
+              "api/controllers/referral-controller",
+              "api/controllers/psico-controller",
+              "api/controllers/create-controller"
+            ]
+          },
+          {
+            "group": "Routes",
+            "pages": [
+              "api/routes/authentication",
+              "api/routes/coordinator-routes",
+              "api/routes/teacher-routes",
+              "api/routes/psychologist-routes"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Role-based access control for coordinators, teachers, and psychologists",
+    "Student referral system with observation and strategy tracking",
+    "PIAR and DUA student management",
+    "Academic structure management (degrees, groups, areas)",
+    "Psycho-orientation reporting and documentation",
+    "Student history and progress tracking",
+    "Email notifications for referral actions",
+    "File attachment support for reports and referrals"
+  ],
+  "publicApiSurface": [
+    "POST /store/referral - Create a new student referral",
+    "GET /index/students/remitted/psico - List referred students for psychologist",
+    "GET /psico/students/active - View active students",
+    "GET /psico/students/piar - View PIAR students",
+    "GET /psico/students/dua - View DUA students",
+    "PUT /accept/student - Accept student to PIAR program",
+    "POST /store/report/student/{id} - Create psycho-orientation report",
+    "POST /store/user - Create new user (coordinator)",
+    "POST /store/degree - Create academic degree",
+    "POST /store/group - Create student group",
+    "POST /store/area - Create academic area"
+  ]
+}
