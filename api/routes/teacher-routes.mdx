@@ -1,0 +1,232 @@
+---
+title: Teacher Routes
+description: Protected routes for teacher role including student referral management and shared functionality with psychologists
+---
+
+## Overview
+
+Teacher routes are divided into two categories:
+1. **Docente-Only Routes**: Exclusive to users with the `docente` role
+2. **Shared Routes**: Available to both `docente` and `psicoorientador` roles
+
+<Warning>
+  All teacher routes require:
+  - `PreventBackHistoryMiddleware` - Prevents browser back button caching
+  - `auth` - User must be authenticated
+  - Role-specific middleware (see each section)
+</Warning>
+
+---
+
+## Docente-Only Routes
+
+<Note>
+  These routes require `RoleDocenteMiddleware` - restricted to users with the `docente` role only.
+</Note>
+
+### GET /index/students/remitted
+
+Displays a list of students remitted by the teacher.
+
+<ParamField path="/index/students/remitted" type="GET">
+  Shows all students that the current teacher has referred to the psychologist.
+</ParamField>
+
+**Controller**: `CreateReferralController@index_student_remitted`
+
+**Middleware**: 
+- `PreventBackHistoryMiddleware`
+- `auth`
+- `RoleDocenteMiddleware`
+
+**Named Route**: `index.student.remitted`
+
+**Required Role**: `docente`
+
+**Source**: web.php:124-125
+
+---
+
+### GET /addMinutes
+
+Allows teachers to add minutes or notes to student referrals.
+
+<ParamField path="/addMinutes" type="GET">
+  Interface for adding meeting minutes or observations to student cases.
+</ParamField>
+
+**Controller**: `CreateReferralController@addMinutes`
+
+**Middleware**: 
+- `PreventBackHistoryMiddleware`
+- `auth`
+- `RoleDocenteMiddleware`
+
+**Named Route**: `addMinutes`
+
+**Required Role**: `docente`
+
+**Source**: web.php:127-128
+
+---
+
+## Shared Routes (Docente & Psicoorientador)
+
+<Note>
+  These routes require `RolePsicoorientadorAndDocenteMiddleware` - available to users with either `docente` or `psicoorientador` role.
+</Note>
+
+### GET /create/referral
+
+Displays the form to create a new student referral.
+
+<ParamField path="/create/referral" type="GET">
+  Shows the referral creation form for referring students to psychological support.
+</ParamField>
+
+**Controller**: `CreateReferralController@create_referral`
+
+**Middleware**: 
+- `PreventBackHistoryMiddleware`
+- `auth`
+- `RolePsicoorientadorAndDocenteMiddleware`
+
+**Named Route**: `create.referral`
+
+**Required Roles**: `docente` OR `psicoorientador`
+
+**Source**: web.php:139-140
+
+---
+
+### POST /store/referral
+
+Creates a new student referral record.
+
+<ParamField path="/store/referral" type="POST">
+  Processes and stores a new student referral in the system.
+</ParamField>
+
+**Controller**: `CreateReferralController@store_referral`
+
+**Middleware**: 
+- `PreventBackHistoryMiddleware`
+- `auth`
+- `RolePsicoorientadorAndDocenteMiddleware`
+
+**Named Route**: `store.referral`
+
+**Required Roles**: `docente` OR `psicoorientador`
+
+**Request Parameters**:
+- Student information
+- Referral reason
+- Observations
+- Date and other referral details
+
+**Source**: web.php:142-143
+
+---
+
+### GET /edit/student/{id}
+
+Displays the form to edit student information.
+
+<ParamField path="/edit/student/{id}" type="GET">
+  Shows the student editing form with current student data.
+</ParamField>
+
+**Controller**: `CreateReferralController@edit_student`
+
+**Middleware**: 
+- `PreventBackHistoryMiddleware`
+- `auth`
+- `RolePsicoorientadorAndDocenteMiddleware`
+
+**Named Route**: `edit.student`
+
+**Required Roles**: `docente` OR `psicoorientador`
+
+**URL Parameters**:
+- `id` (integer, required) - The student ID to edit
+
+**Source**: web.php:145-146
+
+---
+
+### PUT /update/student/{id}
+
+Updates student information.
+
+<ParamField path="/update/student/{id}" type="PUT">
+  Processes student information updates and saves changes.
+</ParamField>
+
+**Controller**: `CreateReferralController@update_student`
+
+**Middleware**: 
+- `PreventBackHistoryMiddleware`
+- `auth`
+- `RolePsicoorientadorAndDocenteMiddleware`
+
+**Named Route**: `update.student`
+
+**Required Roles**: `docente` OR `psicoorientador`
+
+**URL Parameters**:
+- `id` (integer, required) - The student ID to update
+
+**Request Parameters**:
+- Updated student details
+
+**Source**: web.php:148-149
+
+---
+
+## Middleware Reference
+
+### RoleDocenteMiddleware
+
+Restricts access to users with the `docente` role only.
+
+**Behavior**:
+- Checks if user is authenticated
+- Verifies user has `docente` role
+- Returns 403 Forbidden if role check fails
+
+**Error Message**: "No tienes permiso para acceder a esta página."
+
+**Source**: RoleDocenteMiddleware.php:13-21
+
+---
+
+### RolePsicoorientadorAndDocenteMiddleware
+
+Allows access to users with either `docente` or `psicoorientador` role.
+
+**Purpose**: For activities that both teachers and psychologists have in common.
+
+**Behavior**:
+- Checks if user is authenticated
+- Verifies user has either `docente` or `psicoorientador` role
+- Returns 403 Forbidden if role check fails
+
+**Error Message**: "No tienes permiso para acceder a esta página."
+
+**Source**: RolePsicoorientadorAndDocenteMiddleware.php:13-21
+
+---
+
+## Common Use Cases
+
+### Teacher Workflow
+
+1. **Create Referral**: Use `GET /create/referral` to access the form
+2. **Submit Referral**: Send data via `POST /store/referral`
+3. **View Remitted Students**: Check status with `GET /index/students/remitted`
+4. **Add Observations**: Use `GET /addMinutes` to add notes
+
+### Student Management
+
+1. **Edit Student**: Use `GET /edit/student/{id}` to access the form
+2. **Update Student**: Submit changes via `PUT /update/student/{id}`

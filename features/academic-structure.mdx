@@ -1,0 +1,522 @@
+---
+title: Academic Structure
+description: Manage the organizational structure including degrees, groups, and subject areas that form the foundation of the support system.
+---
+
+## Overview
+
+The Academic Structure module provides the foundational organizational framework for the Bethlemitas Student Support System. It manages degrees (grade levels), groups (classes), and subject areas that teachers instruct.
+
+## Core Components
+
+The academic structure consists of three interconnected elements:
+
+<CardGroup cols={3}>
+  <Card title="Degrees" icon="layer-group">
+    Grade levels (e.g., 1st, 2nd, 3rd) that organize students by academic year.
+  </Card>
+  
+  <Card title="Groups" icon="users">
+    Class sections within each grade level (e.g., Group A, Group B).
+  </Card>
+  
+  <Card title="Areas" icon="book">
+    Subject areas or disciplines taught across the curriculum (e.g., Mathematics, Science).
+  </Card>
+</CardGroup>
+
+## Degree Management
+
+### Degree Model
+
+The `Degree` model (`app/Models/Degree.php:9`) represents grade levels:
+
+```php
+protected $fillable = [
+    'degree',
+];
+
+// Relationship with psychologists assigned to grades
+public function users_load_degrees()
+{
+    return $this->hasMany(
+        Users_load_degree::class,
+        'id_degree'
+    );
+}
+```
+
+### Creating Degrees
+
+Access the degree management interface at `/create/degree`:
+
+<Steps>
+  <Step title="Navigate to Degree Management">
+    From the academic coordinator dashboard, select "Manage Degrees".
+    
+    ```php
+    // Route: routes/web.php:105
+    Route::get('/create/degree', [CreateDegreeController::class, 'create_degree'])
+        ->name('create.degree');
+    ```
+  </Step>
+  
+  <Step title="Add New Degree">
+    Enter the degree name or number (e.g., "1", "2", "Primero", "Segundo").
+  </Step>
+  
+  <Step title="Save Degree">
+    Submit the form to create the new degree level.
+    
+    ```php
+    Route::post('/store/degree', [CreateDegreeController::class, 'store_degree'])
+        ->name('store.degree');
+    ```
+  </Step>
+</Steps>
+
+### Degree Operations
+
+<CardGroup cols={3}>
+  <Card title="Create" icon="plus">
+    Add new grade levels as the institution expands.
+  </Card>
+  
+  <Card title="Update" icon="pen">
+    Modify degree names or properties.
+    
+    ```php
+    Route::put('/update/degree', [CreateDegreeController::class, 'update_degree'])
+        ->name('update.degree');
+    ```
+  </Card>
+  
+  <Card title="Delete" icon="trash">
+    Remove unused degree levels (with validation).
+    
+    ```php
+    Route::delete('/delete/degree/{id}', [CreateDegreeController::class, 'destroy_degree'])
+        ->name('delete.degree');
+    ```
+  </Card>
+</CardGroup>
+
+<Warning>
+  Degrees with assigned psychologists or enrolled students cannot be deleted to maintain data integrity.
+</Warning>
+
+## Group Management
+
+### Group Model
+
+The `Group` model (`app/Models/Group.php:8`) represents class sections:
+
+```php
+protected $fillable = [
+    'group',
+];
+
+// Relationship with subject areas taught in this group
+public function areas()
+{
+    return $this->belongsToMany(Area::class, 'subjects_receiveds', 'id_group', 'id_area');
+}
+
+// Relationship with teachers assigned to this group
+public function teachers()
+{
+    return $this->belongsToMany(Users_teacher::class, 'users_load_groups', 'id_group', 'id_user_teacher');
+}
+
+// Relationship with teacher-area-group assignments
+public function teachersGroups()
+{
+    return $this->hasMany(Teachers_areas_group::class, 'id_group');
+}
+```
+
+### Creating Groups
+
+Access group management at `/create/group`:
+
+<Steps>
+  <Step title="Navigate to Group Management">
+    From the academic dashboard, select "Manage Groups".
+    
+    ```php
+    // Route: routes/web.php:100
+    Route::get('/create/group', [CreateGroupController::class, 'create_group'])
+        ->name('create.group');
+    ```
+  </Step>
+  
+  <Step title="Add New Group">
+    Enter the group identifier (e.g., "A", "B", "1", "2").
+  </Step>
+  
+  <Step title="Save Group">
+    Submit to create the new group.
+    
+    ```php
+    Route::post('/store/group', [CreateGroupController::class, 'store_group'])
+        ->name('store.group');
+    ```
+  </Step>
+</Steps>
+
+### Group Operations
+
+```php
+// Update group
+Route::put('/update/group', [CreateGroupController::class, 'update_group'])
+    ->name('update.group');
+
+// Delete group
+Route::delete('/delete/group/{id}', [CreateGroupController::class, 'destroy_group'])
+    ->name('destroy.group');
+```
+
+### Group Director Assignment
+
+Each group can have one designated director (homeroom teacher):
+
+```php
+// In Users_teacher model
+public function director()
+{
+    return $this->belongsTo(Group::class, 'group_director');
+}
+```
+
+When creating or editing a teacher, you can assign them as a group director:
+
+```php
+// In CreateController.php:186
+$user->group_director = $request->input('group_director');
+```
+
+<Note>
+  Only one teacher can be assigned as director for each group. The system validates this constraint.
+</Note>
+
+## Area Management
+
+### Area Model
+
+The `Area` model (`app/Models/Area.php:8`) represents subject areas:
+
+```php
+protected $fillable = [
+    'name_area',
+];
+
+// Teachers who teach this area
+public function teachers()
+{
+    return $this->belongsToMany(
+        Users_teacher::class, 
+        'teachers_areas_groups', 
+        'id_area', 
+        'id_teacher'
+    );
+}
+
+// Teacher-area-group relationships
+public function teachersGroups()
+{
+    return $this->hasMany(Teachers_areas_group::class, 'id_areas');
+}
+```
+
+### Creating Areas
+
+Access area management at `/create/area`:
+
+<Steps>
+  <Step title="Navigate to Area Management">
+    From the academic dashboard, select "Manage Areas".
+    
+    ```php
+    // Route: routes/web.php:110
+    Route::get('/create/area', [CreateAreaController::class, 'create_area'])
+        ->name('create.area');
+    ```
+  </Step>
+  
+  <Step title="Add New Area">
+    Enter the subject area name (e.g., "Mathematics", "Science", "Language Arts").
+  </Step>
+  
+  <Step title="Save Area">
+    Submit to create the new subject area.
+    
+    ```php
+    Route::post('/store/area', [CreateAreaController::class, 'store_area'])
+        ->name('store.area');
+    ```
+  </Step>
+</Steps>
+
+### Area Operations
+
+```php
+// Update area
+Route::put('/update/area', [CreateAreaController::class, 'update_area'])
+    ->name('update.area');
+
+// Delete area
+Route::delete('/delete/area/{id}', [CreateAreaController::class, 'destroy_area'])
+    ->name('delete.area');
+```
+
+<Warning>
+  Areas assigned to teachers cannot be deleted without first removing those assignments.
+</Warning>
+
+## Teachers-Areas-Groups Relationship
+
+The system uses a three-way pivot table (`teachers_areas_groups`) to track which teacher teaches which area in which group:
+
+### Data Structure
+
+```php
+// Table: teachers_areas_groups
+[
+    'id_teacher' => 1,  // Teacher ID
+    'id_area' => 2,     // Area (subject) ID
+    'id_group' => 3,    // Group (class) ID
+]
+```
+
+### Usage Example
+
+When creating a teacher assignment:
+
+```php
+// Teacher 1 teaches Mathematics (Area 2) in Group A (3) and Group B (4)
+DB::table('teachers_areas_groups')->insert([
+    [
+        'id_teacher' => 1,
+        'id_area' => 2,  // Mathematics
+        'id_group' => 3, // Group A
+    ],
+    [
+        'id_teacher' => 1,
+        'id_area' => 2,  // Mathematics
+        'id_group' => 4, // Group B
+    ]
+]);
+```
+
+### Validation Logic
+
+The system enforces business rules (`app/Http/Controllers/CreateController.php:165`):
+
+```php
+// Verify no area/group conflicts
+foreach ($request->area_id as $area_id) {
+    if (isset($request->groups_asig[$area_id])) {
+        foreach ($request->groups_asig[$area_id] as $groupId) {
+            $exists = Teachers_areas_group::where('id_area', $area_id)
+                ->where('id_group', $groupId)
+                ->exists();
+            if ($exists) {
+                $name_area = Area::find($area_id)->name_area;
+                $name_group = Group::find($groupId)->group;
+                return redirect()->back()->with('error', 
+                    "Area {$name_area} is already taught in group {$name_group} by another teacher");
+            }
+        }
+    }
+}
+```
+
+<Note>
+  This ensures that each subject in each class has only one assigned teacher, preventing scheduling conflicts.
+</Note>
+
+## Psychologist-Degree Assignments
+
+Psychologists are assigned to specific grade levels through the `users_load_degrees` table:
+
+### Data Structure
+
+```php
+// Table: users_load_degrees
+[
+    'id_user' => 5,     // Psychologist user ID
+    'id_degree' => 1,   // Grade level ID
+]
+```
+
+### Assignment Logic
+
+When creating a psychologist (`app/Http/Controllers/CreateController.php:269`):
+
+```php
+// Verify no degree conflicts
+foreach ($request->load_degree as $degree) {
+    $exists = Users_load_degree::where('id_degree', $degree)->exists();
+    if ($exists) {
+        return redirect()->back()->with('error', 
+            'Some grades are already assigned to another psychologist.');
+    }
+}
+
+// Save grade assignments
+foreach ($request->load_degree as $load_degree) {
+    DB::table('users_load_degrees')->insert([
+        'id_user' => $user->id,
+        'id_degree' => $load_degree,
+    ]);
+}
+```
+
+<Warning>
+  Each grade level can only be assigned to one psychologist at a time to ensure clear responsibility and prevent confusion.
+</Warning>
+
+## Sorting and Display
+
+The system uses custom sorting for natural ordering:
+
+```php
+// Sort groups numerically then alphabetically
+$groups = Group::orderByRaw('CAST(`group` AS UNSIGNED), `group`')->get();
+
+// Sort degrees numerically then alphabetically
+$degrees = Degree::orderByRaw('CAST(`degree` AS UNSIGNED), `degree`')->get();
+
+// Sort areas alphabetically
+$areas = Area::orderBy('name_area', 'asc')->get();
+```
+
+This ensures natural ordering like:
+- Groups: 1, 2, 10, 11, A, B
+- Degrees: 1, 2, 10, 11, Primero
+
+## Integration with Other Modules
+
+### Student Referrals
+
+When creating a referral, the teacher selects the student's degree and group:
+
+```php
+// In CreateReferralController.php:23
+public function create_referral()
+{
+    $groups = Group::orderByRaw('CAST(`group` AS UNSIGNED), `group`')->get();
+    $degrees = Degree::orderByRaw('CAST(`degree` AS UNSIGNED), `degree`')->get();
+    
+    return view('teacher.studentReferral', compact('groups', 'degrees'));
+}
+```
+
+### Psychologist Assignment
+
+The system automatically finds the appropriate psychologist based on student's degree:
+
+```php
+// In CreateReferralController.php:52
+$degreeLoad = Users_load_degree::where('id_degree', $request->input('degree'))->first();
+
+if (!$degreeLoad) {
+    return redirect()->back()->with('error', 
+        'No psychologist assigned to the selected grade.');
+}
+
+$id_psico = $degreeLoad->id_user;
+```
+
+### User Management
+
+Teacher and psychologist assignments depend on the academic structure:
+
+```php
+// Teacher creation requires areas and groups
+$request->validate([
+    'areas' => 'required|array',
+    'groups' => 'required|array',
+]);
+
+// Psychologist creation requires degrees
+$request->validate([
+    'load_degree' => 'required|array',
+]);
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Plan Structure First" icon="sitemap">
+    Set up degrees, groups, and areas before creating users to ensure smooth assignment process.
+  </Card>
+  
+  <Card title="Consistent Naming" icon="font">
+    Use consistent naming conventions (e.g., all numeric or all alphabetic for groups).
+  </Card>
+  
+  <Card title="Complete Coverage" icon="check-double">
+    Ensure every grade has an assigned psychologist before students can be referred.
+  </Card>
+  
+  <Card title="Avoid Conflicts" icon="triangle-exclamation">
+    The system prevents but verify that no area/group combination has multiple teachers.
+  </Card>
+  
+  <Card title="Maintain Relationships" icon="link">
+    Don't delete degrees, groups, or areas that have active assignments or enrolled students.
+  </Card>
+  
+  <Card title="Regular Review" icon="calendar-check">
+    Periodically review the academic structure for needed updates or corrections.
+  </Card>
+</CardGroup>
+
+## Data Integrity
+
+The system maintains referential integrity through:
+
+1. **Foreign Key Constraints**: Database-level constraints prevent orphaned records
+2. **Application-Level Validation**: Business logic prevents invalid assignments
+3. **Cascade Rules**: Deletions cascade appropriately or are prevented when dependencies exist
+4. **Transaction Safety**: Multi-table operations use database transactions
+
+## Common Operations
+
+### View All Assignments
+
+```php
+// Get teacher with all assignments
+$teacher = Users_teacher::with([
+    'groups',
+    'areas',
+    'areasGroups'
+])->find($id);
+
+// Get group with all teachers and areas
+$group = Group::with([
+    'teachers',
+    'areas',
+    'teachersGroups'
+])->find($id);
+```
+
+### Check Assignment Availability
+
+```php
+// Check if area/group combination is available
+$isAvailable = !Teachers_areas_group::where('id_area', $area_id)
+    ->where('id_group', $group_id)
+    ->exists();
+
+// Check if degree is available for psychologist
+$isAvailable = !Users_load_degree::where('id_degree', $degree_id)
+    ->exists();
+```
+
+## Related Features
+
+- [User Management](/features/user-management)
+- [Student Referrals](/features/student-referrals)
+- [Psycho-Orientation](/features/psycho-orientation)

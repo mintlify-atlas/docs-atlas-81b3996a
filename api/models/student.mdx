@@ -1,0 +1,338 @@
+---
+title: "Users_student Model"
+description: "Student user model with academic information, relationships, and referral tracking"
+---
+
+## Overview
+
+The `Users_student` model represents students in the Bethlemitas Student Support System. It manages student profiles, academic assignments, and relationships with teachers, referrals, and psycho-orientation records.
+
+**Namespace:** `App\Models\Users_student`
+
+**Extends:** `Illuminate\Database\Eloquent\Model`
+
+**Traits:**
+- `HasFactory` - Enables model factories for testing
+- `HasRoles` (Spatie) - Provides role-based permissions
+
+## Model Definition
+
+```php
+class Users_student extends Model
+{
+    use HasFactory, HasRoles;
+
+    protected $guard_name = 'web';
+}
+```
+
+## Fillable Fields
+
+These fields can be mass-assigned when creating or updating student records.
+
+<ParamField body="number_documment" type="string" required>
+  Student's document number (ID number)
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  Student's first name
+</ParamField>
+
+<ParamField body="last_name" type="string" required>
+  Student's last name
+</ParamField>
+
+<ParamField body="age" type="integer" required>
+  Student's age
+</ParamField>
+
+<ParamField body="birthplace" type="string">
+  Student's place of birth
+</ParamField>
+
+<ParamField body="address" type="string">
+  Student's residential address
+</ParamField>
+
+<ParamField body="type_documment" type="string">
+  Type of identification document (e.g., TI, CC, CE)
+</ParamField>
+
+<ParamField body="phone" type="string">
+  Student's contact phone number
+</ParamField>
+
+<ParamField body="email" type="string">
+  Student's email address
+</ParamField>
+
+<ParamField body="victim_conflict" type="boolean">
+  Indicates if the student is a victim of armed conflict
+</ParamField>
+
+<ParamField body="id_degree" type="integer" required>
+  Foreign key to the Degree model (academic grade level)
+</ParamField>
+
+<ParamField body="id_group" type="integer" required>
+  Foreign key to the Group model (class/section)
+</ParamField>
+
+<ParamField body="id_institution" type="integer">
+  Foreign key to the Institution model
+</ParamField>
+
+<ParamField body="sent_by" type="integer">
+  Foreign key to Users_teacher model - teacher who registered the student
+</ParamField>
+
+<ParamField body="id_state" type="integer">
+  Foreign key to State model - student's current status
+</ParamField>
+
+<ParamField body="activation_period" type="string">
+  Academic period when the student was activated in the system
+</ParamField>
+
+## Relationships
+
+### BelongsTo Relationships
+
+<Expandable title="teacher()">
+  Returns the teacher who registered this student.
+
+  ```php
+  public function teacher()
+  {
+      return $this->belongsTo(Users_teacher::class, 'sent_by');
+  }
+  ```
+
+  **Foreign Key:** `sent_by`
+  
+  **Related Model:** [Users_teacher](/api/models/teacher)
+
+  **Usage:**
+  ```php
+  $student = Users_student::find(1);
+  $teacher = $student->teacher;
+  echo $teacher->name;
+  ```
+</Expandable>
+
+<Expandable title="degree()">
+  Returns the academic degree/grade the student belongs to.
+
+  ```php
+  public function degree()
+  {
+      return $this->belongsTo(Degree::class, 'id_degree');
+  }
+  ```
+
+  **Foreign Key:** `id_degree`
+  
+  **Related Model:** `Degree`
+
+  **Usage:**
+  ```php
+  $student = Users_student::find(1);
+  $degree = $student->degree;
+  echo $degree->name; // e.g., "6th Grade"
+  ```
+</Expandable>
+
+<Expandable title="group()">
+  Returns the class group the student belongs to.
+
+  ```php
+  public function group()
+  {
+      return $this->belongsTo(Group::class, 'id_group');
+  }
+  ```
+
+  **Foreign Key:** `id_group`
+  
+  **Related Model:** `Group`
+
+  **Usage:**
+  ```php
+  $student = Users_student::find(1);
+  $group = $student->group;
+  echo $group->name; // e.g., "6A"
+  ```
+</Expandable>
+
+<Expandable title="states()">
+  Returns the current state/status of the student.
+
+  ```php
+  public function states()
+  {
+      return $this->belongsTo(State::class, 'id_state');
+  }
+  ```
+
+  **Foreign Key:** `id_state`
+  
+  **Related Model:** `State`
+
+  **Usage:**
+  ```php
+  $student = Users_student::find(1);
+  $state = $student->states;
+  echo $state->name; // e.g., "Active", "Inactive"
+  ```
+</Expandable>
+
+### HasMany Relationships
+
+<Expandable title="psychoorientations()">
+  Returns all psycho-orientation records associated with this student.
+
+  ```php
+  public function psychoorientations()
+  {
+      return $this->hasMany(Psychoorientation::class, 'id_user_student');
+  }
+  ```
+
+  **Foreign Key:** `id_user_student` (in Psychoorientation table)
+  
+  **Related Model:** [Psychoorientation](/api/models/psychoorientation)
+
+  **Usage:**
+  ```php
+  $student = Users_student::find(1);
+  $sessions = $student->psychoorientations;
+  
+  foreach ($sessions as $session) {
+      echo $session->title_report;
+  }
+  ```
+</Expandable>
+
+<Expandable title="referrals()">
+  Returns all referral records for this student.
+
+  ```php
+  public function referrals()
+  {
+      return $this->hasMany(Referral::class, 'id_user_student');
+  }
+  ```
+
+  **Foreign Key:** `id_user_student` (in Referral table)
+  
+  **Related Model:** [Referral](/api/models/referral)
+
+  **Usage:**
+  ```php
+  $student = Users_student::find(1);
+  $referrals = $student->referrals;
+  
+  foreach ($referrals as $referral) {
+      echo $referral->reason;
+  }
+  ```
+</Expandable>
+
+### HasOne Relationships
+
+<Expandable title="latestReferral()">
+  Returns the most recent referral record for this student.
+
+  ```php
+  public function latestReferral()
+  {
+      return $this->hasOne(Referral::class, 'id_user_student')->latestOfMany();
+  }
+  ```
+
+  **Foreign Key:** `id_user_student`
+  
+  **Related Model:** [Referral](/api/models/referral)
+
+  **Usage:**
+  ```php
+  $student = Users_student::find(1);
+  $latest = $student->latestReferral;
+  
+  if ($latest) {
+      echo "Latest referral: " . $latest->reason;
+  }
+  ```
+</Expandable>
+
+## Usage Examples
+
+### Creating a Student
+
+```php
+use App\Models\Users_student;
+
+$student = Users_student::create([
+    'number_documment' => '1234567890',
+    'name' => 'Juan',
+    'last_name' => 'Pérez',
+    'age' => 12,
+    'birthplace' => 'Medellín',
+    'address' => 'Calle 123 #45-67',
+    'type_documment' => 'TI',
+    'phone' => '3001234567',
+    'email' => 'juan.perez@example.com',
+    'victim_conflict' => false,
+    'id_degree' => 6,
+    'id_group' => 2,
+    'id_institution' => 1,
+    'sent_by' => 5,
+    'id_state' => 1,
+    'activation_period' => '2024-1',
+]);
+```
+
+### Querying with Relationships
+
+```php
+// Get student with all relationships
+$student = Users_student::with([
+    'teacher',
+    'degree',
+    'group',
+    'referrals',
+    'psychoorientations',
+    'latestReferral'
+])->find(1);
+
+// Access related data
+echo "Student: {$student->name} {$student->last_name}";
+echo "Grade: {$student->degree->name}";
+echo "Group: {$student->group->name}";
+echo "Teacher: {$student->teacher->name}";
+echo "Total Referrals: " . $student->referrals->count();
+```
+
+### Filtering Students
+
+```php
+// Active students in a specific grade
+$students = Users_student::where('id_degree', 6)
+    ->where('id_state', 1)
+    ->get();
+
+// Students with referrals
+$studentsWithReferrals = Users_student::has('referrals')
+    ->with('latestReferral')
+    ->get();
+
+// Conflict victims
+$victimStudents = Users_student::where('victim_conflict', true)
+    ->get();
+```
+
+## Source Code Reference
+
+View the complete model implementation:
+
+**File:** `/home/daytona/workspace/source/app/Models/Users_student.php:10-78`

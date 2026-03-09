@@ -1,97 +1,132 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Bethlemitas Student Support System"
+description: "A comprehensive student referral and psychological support management system for educational institutions"
 ---
 
-## Setting up
+<div className="hero-section" style={{ padding: '3rem 0', textAlign: 'center' }}>
+  <h1 style={{ fontSize: '3rem', fontWeight: '700', marginBottom: '1.5rem', color: '#1a1a1a' }}>
+    Student Support Management
+  </h1>
+  <p style={{ fontSize: '1.25rem', color: '#1a1a1a', maxWidth: '42rem', margin: '0 auto 2rem' }}>
+    Streamline student referrals, psychological support, and PIAR/DUA management with a comprehensive system designed for educational institutions.
+  </p>
+</div>
 
-Get your documentation site up and running in minutes.
+## Get Started
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+Begin managing student support services in minutes.
 
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
+<CardGroup cols={2}>
   <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
+    title="Installation"
+    icon="download"
+    href="/installation"
   >
-    Edit your docs locally and preview them in real time.
+    Set up the Bethlemitas system in your institution
   </Card>
   <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
+    title="Configuration"
+    icon="gear"
+    href="/configuration"
   >
-    Customize the design and colors of your site to match your brand.
+    Configure roles, permissions, and institutional settings
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
+</CardGroup>
+
+## Core Features
+
+Powerful tools for comprehensive student support management.
+
+<CardGroup cols={2}>
+  <Card
+    title="Student Referrals"
+    icon="hand-holding-heart"
+    href="/features/student-referrals"
   >
-    Organize your docs to help users find what they need and succeed with your product.
+    Create and track student referrals with detailed observations and strategies
   </Card>
   <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
+    title="Psycho-Orientation"
+    icon="brain"
+    href="/features/psycho-orientation"
   >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
-
-## Create beautiful pages
-
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
+    Manage psychological support reports and student progress
   </Card>
   <Card
-    title="Code samples"
+    title="User Management"
+    icon="users"
+    href="/features/user-management"
+  >
+    Manage coordinators, teachers, psychologists, and students
+  </Card>
+  <Card
+    title="PIAR & DUA Management"
+    icon="clipboard-list"
+    href="/features/piar-dua-management"
+  >
+    Track Individual Adjustment Plans and Universal Design for Learning
+  </Card>
+</CardGroup>
+
+## User Roles
+
+Understand the different roles and their capabilities.
+
+<CardGroup cols={3}>
+  <Card
+    title="Coordinator"
+    icon="user-crown"
+    href="/roles/coordinator"
+  >
+    Full system access for institutional management
+  </Card>
+  <Card
+    title="Teacher"
+    icon="chalkboard-user"
+    href="/roles/teacher"
+  >
+    Create referrals and track student progress
+  </Card>
+  <Card
+    title="Psychologist"
+    icon="user-doctor"
+    href="/roles/psychologist"
+  >
+    Review referrals and create support reports
+  </Card>
+</CardGroup>
+
+## API Reference
+
+Explore the technical documentation for developers.
+
+<CardGroup cols={2}>
+  <Card
+    title="Models"
+    icon="database"
+    href="/api/models/student"
+  >
+    Database models and relationships
+  </Card>
+  <Card
+    title="Controllers"
     icon="code"
-    href="/essentials/code"
+    href="/api/controllers/referral-controller"
   >
-    Add sample code to demonstrate how to use your product.
+    Request handling and business logic
   </Card>
   <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
+    title="Routes"
+    icon="route"
+    href="/api/routes/authentication"
   >
-    Display images and other media.
+    API endpoints and middleware
   </Card>
   <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
+    title="Authentication"
+    icon="lock"
+    href="/guides/authentication"
   >
-    Write once and reuse across your docs.
+    Security and access control
   </Card>
-</Columns>
-
-## Need inspiration?
-
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+</CardGroup>

@@ -1,0 +1,152 @@
+---
+title: Introduction
+description: Overview of the Bethlemitas Student Support System - A comprehensive educational management platform for PIAR and DUA processes
+---
+
+## What is the Bethlemitas Student Support System?
+
+The Bethlemitas Student Support System is a specialized Laravel-based web application designed to manage and streamline the educational support process for students requiring individualized learning plans. The system focuses on two key educational frameworks:
+
+- **PIAR (Plan Individual de Ajustes Razonables)** - Individual Plan for Reasonable Adjustments
+- **DUA (Diseño Universal para el Aprendizaje)** - Universal Design for Learning
+
+## Key Features
+
+### Role-Based Access Control
+
+The system implements a robust permission system using Spatie Laravel Permission, supporting four distinct user roles:
+
+<CardGroup cols={2}>
+  <Card title="Coordinador" icon="user-tie">
+    Administrative role with full access to user management, institutional configuration, and system-wide settings
+  </Card>
+  <Card title="Docente (Teacher)" icon="chalkboard-user">
+    Create student referrals, track remitted students, and manage classroom-level interventions
+  </Card>
+  <Card title="Psicoorientador" icon="user-graduate">
+    Process referrals, create PIAR/DUA plans, manage student characteristics, and generate comprehensive reports
+  </Card>
+  <Card title="Estudiante (Student)" icon="user">
+    Student profiles with complete academic and support history tracking
+  </Card>
+</CardGroup>
+
+### Student Referral System
+
+Teachers can create detailed referrals for students who need additional support, including:
+
+- Reason for referral
+- Behavioral observations
+- Strategies already attempted
+- Course and academic context
+
+Referrals flow through a structured workflow from teacher creation to psycho-orientator review and intervention planning.
+
+### PIAR Management
+
+The system provides comprehensive tools for creating and managing Individual Plans for Reasonable Adjustments:
+
+- Student characteristic profiles
+- Learning area assessments
+- Objective and purpose definition
+- Barrier identification
+- Reasonable adjustment planning
+- Evaluation adjustment tracking
+- Multi-period history
+
+See `~/workspace/source/database/migrations/2025_08_23_140001_create_acta_piars_table.php` for the complete PIAR data structure.
+
+### DUA Implementation
+
+Universal Design for Learning activities can be created with:
+
+- Activity descriptions
+- Observations and goals
+- Resource allocation
+- Expected results tracking
+- Area and period associations
+
+Reference: `~/workspace/source/database/migrations/2025_08_26_171603_create_dua.php`
+
+### Student State Tracking
+
+The system tracks students through three distinct states:
+
+1. **Activo** - Active in regular curriculum
+2. **En PIAR** - Participating in individualized adjustment plan
+3. **En DUA** - Participating in universal design interventions
+
+State transitions are managed through the psycho-orientator workflows.
+
+## Who Is This System For?
+
+### Educational Institutions
+
+The system is designed for schools and educational institutions that:
+
+- Need to manage diverse learning needs
+- Implement inclusive education frameworks
+- Require structured documentation of student support interventions
+- Want to track student progress across multiple academic periods
+- Must maintain compliance with educational accessibility standards
+
+### User Personas
+
+<Steps>
+  <Step title="School Coordinators">
+    Manage users, configure institutional settings, oversee degrees/groups/areas, and maintain system-wide data integrity
+  </Step>
+  <Step title="Teachers">
+    Identify students needing support, create referrals with detailed observations, and collaborate with psycho-orientators
+  </Step>
+  <Step title="Psycho-Orientators">
+    Review referrals, assess student needs, create individualized plans, generate reports, and track long-term student progress
+  </Step>
+</Steps>
+
+## Technical Foundation
+
+The system is built on modern, reliable technologies:
+
+- **Laravel 11.9** - PHP 8.2 framework providing robust MVC architecture
+- **Spatie Laravel Permission 6.3** - Role and permission management
+- **MySQL** - Relational database for structured educational data
+- **Spanish Localization** - Default locale set to Spanish (es_ES) for Latin American educational contexts
+
+See `~/workspace/source/composer.json` for the complete dependency list.
+
+## Core Capabilities
+
+<AccordionGroup>
+  <Accordion title="User Management">
+    Create and manage teacher and student accounts with detailed profiles including document numbers, contact information, institutional assignments, and role-based permissions.
+  </Accordion>
+  
+  <Accordion title="Academic Structure">
+    Configure degrees (grades), groups (classes), areas (subjects), and periods (terms) to match your institution's organizational structure.
+  </Accordion>
+  
+  <Accordion title="Referral Workflow">
+    Structured process from teacher observation through psycho-orientator intervention, with complete audit trail and historical tracking.
+  </Accordion>
+  
+  <Accordion title="Document Generation">
+    Generate comprehensive reports including student histories, PIAR actas, annual reports, and intervention strategies.
+  </Accordion>
+  
+  <Accordion title="Multi-Period Tracking">
+    Track student progress across multiple academic periods with historical data preservation and trend analysis.
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+  The system includes Spanish localization by default (`APP_LOCALE=es` in `.env.example`) and is designed specifically for educational contexts in Spanish-speaking regions.
+</Note>
+
+## Next Steps
+
+Ready to get started? Proceed to the installation guide to set up your instance of the Bethlemitas Student Support System.
+
+<Card title="Installation Guide" icon="download" href="/installation">
+  Learn how to install and configure the system in your environment
+</Card>

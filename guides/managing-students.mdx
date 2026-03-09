@@ -1,0 +1,288 @@
+---
+title: "Managing Students"
+description: "Guide for updating student information, tracking progress, and managing student records"
+---
+
+## Overview
+
+Both teachers and psychologists can manage student information after a referral has been created. This guide covers how to view, edit, and track student records.
+
+## Viewing Student Lists
+
+### For Teachers
+
+Teachers can view students they have referred:
+
+**Route:** `GET /index/students/remitted`
+
+```php CreateReferralController.php
+public function index_student_remitted()
+{
+    $id_teacher = Auth::id();
+    
+    $students = Users_student::where('sent_by', $id_teacher)
+        ->with(['degree', 'group', 'states', 'latestReferral'])
+        ->orderBy('name')
+        ->paginate(10);
+    
+    return view('teacher.studentsRemitted', compact('students'));
+}
+```
+
+### For Psychologists
+
+Psychologists see students assigned to their grade levels:
+
+**Route:** `GET /index/students/remitted/psico`
+
+Students are filtered by:
+- Grade assignments (`Users_load_degree`)
+- Search functionality (name, last name, document number)
+- Pagination (10 per page)
+
+<Note>
+Psychologists can also filter students by state using dedicated routes: `/psico/students/active`, `/psico/students/piar`, `/psico/students/dua`
+</Note>
+
+## Editing Student Information
+
+<Steps>
+  <Step title="Access Edit Form">
+    Click the edit button next to a student record. This navigates to:
+    
+    **Route:** `GET /edit/student/{id}`
+    
+    The form pre-populates with current student data.
+  </Step>
+
+  <Step title="Update Student Fields">
+    You can modify:
+
+    <ParamField path="name" type="string">
+      Student's first name
+    </ParamField>
+
+    <ParamField path="last_name" type="string">
+      Student's last name
+    </ParamField>
+
+    <ParamField path="age" type="integer">
+      Student's age
+    </ParamField>
+
+    <ParamField path="birthplace" type="string">
+      Place of birth
+    </ParamField>
+
+    <ParamField path="address" type="string">
+      Home address
+    </ParamField>
+
+    <ParamField path="phone" type="string">
+      Contact phone number
+    </ParamField>
+
+    <ParamField path="email" type="string">
+      Student's email address
+    </ParamField>
+
+    <ParamField path="victim_conflict" type="boolean">
+      Whether student is a victim of armed conflict
+    </ParamField>
+
+    <ParamField path="id_degree" type="integer">
+      Academic grade level
+    </ParamField>
+
+    <ParamField path="id_group" type="integer">
+      Class section/group
+    </ParamField>
+  </Step>
+
+  <Step title="Submit Changes">
+    Submit the form to update the student record.
+    
+    **Route:** `PUT /update/student/{id}`
+  </Step>
+</Steps>
+
+## Update Logic
+
+The `update_student()` method handles the update process:
+
+```php CreateReferralController.php
+public function update_student(Request $request, $id)
+{
+    $request->validate([
+        'name' => 'required|string|max:255',
+        'last_name' => 'required|string|max:255',
+        'age' => 'nullable|integer|min:0',
+        'birthplace' => 'nullable|string|max:255',
+        'address' => 'nullable|string|max:255',
+        'phone' => 'nullable|string|max:20',
+        'email' => 'nullable|email|max:255',
+        'victim_conflict' => 'nullable|boolean',
+        'id_degree' => 'required|exists:degrees,id',
+        'id_group' => 'required|exists:groups,id',
+    ]);
+
+    $student = Users_student::findOrFail($id);
+    $student->update($request->all());
+
+    return redirect()->back()->with('success', 'Información del estudiante actualizada exitosamente.');
+}
+```
+
+<Warning>
+Changing a student's grade level may reassign them to a different psychologist if grade-level assignments have changed.
+</Warning>
+
+## Student Status Tracking
+
+### Status States
+
+Students progress through different states:
+
+<CardGroup cols={3}>
+  <Card title="Activo" icon="circle-check">
+    Initial referral under review
+  </Card>
+  <Card title="En PIAR" icon="clipboard-list">
+    Individual Adjustment Plan in progress
+  </Card>
+  <Card title="En DUA" icon="universal-access">
+    Universal Design for Learning activities
+  </Card>
+</CardGroup>
+
+### Viewing Student History
+
+Psychologists can access complete student history:
+
+**Route:** `GET /student/history/{id}`
+
+This displays:
+- All referrals (past and current)
+- All psychological reports
+- State transitions
+- PIAR/DUA documentation
+- Timeline of interventions
+
+```php PsicoController.php
+public function show_student_history($id)
+{
+    $student = Users_student::with([
+        'referrals' => function ($query) {
+            $query->orderBy('created_at', 'desc');
+        },
+        'psychoorientations' => function ($query) {
+            $query->orderBy('created_at', 'desc');
+        },
+        'degree',
+        'group',
+        'states'
+    ])->findOrFail($id);
+
+    return view('psycho.studentHistory', compact('student'));
+}
+```
+
+## Managing Referral Details
+
+### Viewing Referral Details
+
+Access detailed referral information:
+
+**Route:** `GET /details/referral/{id}`
+
+Displays:
+- Original referral reason
+- Teacher observations
+- Attempted strategies
+- Attached files (if any)
+- Creation date and referring teacher
+
+### Updating Referral Information
+
+Psychologists can add notes or update referral details:
+
+**Route:** `PUT /edit/details/referral/{id}`
+
+```php PsicoController.php
+public function update_details_referral(Request $request, $id)
+{
+    $referral = Referral::findOrFail($id);
+    
+    $referral->update([
+        'observation' => $request->observation,
+        'strategies' => $request->strategies,
+    ]);
+    
+    return redirect()->back()->with('success', 'Remisión actualizada.');
+}
+```
+
+<Note>
+Only psychologists assigned to the student's grade can update referral details.
+</Note>
+
+## Search and Filtering
+
+### Search Functionality
+
+All student lists support search by:
+- Student name
+- Last name
+- Document number
+- Concatenated full name
+
+```php PsicoController.php
+if ($request->filled('search')) {
+    $search = $request->search;
+    $query->where(function ($q) use ($search) {
+        $q->where('name', 'LIKE', "%$search%")
+          ->orWhere('last_name', 'LIKE', "%$search%")
+          ->orWhere('number_documment', 'LIKE', "%$search%")
+          ->orWhereRaw("CONCAT(name,' ',last_name) LIKE ?", ["%$search%"]);
+    });
+}
+```
+
+### Filtering by State
+
+Psychologists have dedicated routes for each state:
+
+<Tabs>
+  <Tab title="Active Students">
+    **Route:** `GET /psico/students/active`
+    
+    Students with active referrals under initial review.
+  </Tab>
+  <Tab title="PIAR Students">
+    **Route:** `GET /psico/students/piar`
+    
+    Students with Individual Adjustment Plans.
+  </Tab>
+  <Tab title="DUA Students">
+    **Route:** `GET /psico/students/dua`
+    
+    Students in Universal Design for Learning program.
+  </Tab>
+</Tabs>
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card title="Creating Referrals" icon="hand-holding-heart" href="/guides/creating-referrals">
+    How to create new student referrals
+  </Card>
+  <Card title="Reports and Tracking" icon="chart-line" href="/guides/reports-and-tracking">
+    Generate and manage psychological reports
+  </Card>
+  <Card title="PIAR & DUA Management" icon="clipboard-list" href="/features/piar-dua-management">
+    Learn about PIAR and DUA programs
+  </Card>
+  <Card title="Psychologist Role" icon="user-doctor" href="/roles/psychologist">
+    Full capabilities of the psychologist role
+  </Card>
+</CardGroup>

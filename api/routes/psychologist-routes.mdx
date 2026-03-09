@@ -1,0 +1,434 @@
+---
+title: Psychologist Routes
+description: Protected routes for psychologist role including student management, PIAR/DUA tracking, reports, and referral processing
+---
+
+## Overview
+
+Psychologist routes provide comprehensive student support management including referral processing, student categorization (Active, PIAR, DUA), report generation, and historical tracking.
+
+<Warning>
+  All psychologist routes require:
+  - `PreventBackHistoryMiddleware` - Prevents browser back button caching
+  - `auth` - User must be authenticated
+  - `RolePsicoorientadorMiddleware` - User must have `psicoorientador` role
+</Warning>
+
+---
+
+## Student Referral Management
+
+### GET /index/students/remitted/psico
+
+Displays all students remitted to the psychologist.
+
+<ParamField path="/index/students/remitted/psico" type="GET">
+  Shows a comprehensive list of all student referrals awaiting psychologist review.
+</ParamField>
+
+**Controller**: `PsicoController@index_student_remitted_psico`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RolePsicoorientadorMiddleware`
+
+**Named Route**: `index.student.remitted.psico`
+
+**Required Role**: `psicoorientador`
+
+**Source**: web.php:160-161
+
+---
+
+## Student Classification by Status
+
+### GET /psico/students/active
+
+Displays active students under psychological monitoring.
+
+<ParamField path="/psico/students/active" type="GET">
+  Shows students currently receiving active psychological support.
+</ParamField>
+
+**Controller**: `PsicoController@index_students_active_psico`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RolePsicoorientadorMiddleware`
+
+**Named Route**: `psico.students.active`
+
+**Required Role**: `psicoorientador`
+
+**Source**: web.php:164-165
+
+---
+
+### GET /psico/students/piar
+
+Displays students with PIAR (Plan Individual de Ajustes Razonables).
+
+<ParamField path="/psico/students/piar" type="GET">
+  Shows students requiring individualized reasonable adjustment plans.
+</ParamField>
+
+**Controller**: `PsicoController@index_students_piar_psico`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RolePsicoorientadorMiddleware`
+
+**Named Route**: `psico.students.piar`
+
+**Required Role**: `psicoorientador`
+
+<Note>
+  PIAR students have specific educational accommodations and require specialized support planning.
+</Note>
+
+**Source**: web.php:167-168
+
+---
+
+### GET /psico/students/dua
+
+Displays students with DUA (Diseño Universal para el Aprendizaje).
+
+<ParamField path="/psico/students/dua" type="GET">
+  Shows students under Universal Design for Learning framework.
+</ParamField>
+
+**Controller**: `PsicoController@index_students_dua_psico`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RolePsicoorientadorMiddleware`
+
+**Named Route**: `psico.students.dua`
+
+**Required Role**: `psicoorientador`
+
+<Note>
+  DUA students follow Universal Design for Learning principles with flexible educational approaches.
+</Note>
+
+**Source**: web.php:170-171
+
+---
+
+## Referral Details Management
+
+### GET /details/referral/{id}
+
+Displays detailed information about a specific referral.
+
+<ParamField path="/details/referral/{id}" type="GET">
+  Shows comprehensive details of a student referral including reason, observations, and status.
+</ParamField>
+
+**Controller**: `PsicoController@detailsReferral`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RolePsicoorientadorMiddleware`
+
+**Named Route**: `details.referral`
+
+**Required Role**: `psicoorientador`
+
+**URL Parameters**:
+- `id` (integer, required) - The referral ID to view
+
+**Source**: web.php:173-174
+
+---
+
+### PUT /edit/details/referral/{id}
+
+Updates referral details and processing information.
+
+<ParamField path="/edit/details/referral/{id}" type="PUT">
+  Updates referral information, status, and psychologist observations.
+</ParamField>
+
+**Controller**: `PsicoController@update_details_referral`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RolePsicoorientadorMiddleware`
+
+**Named Route**: `update.details.referral`
+
+**Required Role**: `psicoorientador`
+
+**URL Parameters**:
+- `id` (integer, required) - The referral ID to update
+
+**Request Parameters**:
+- Updated referral details
+- Status changes
+- Psychologist notes
+
+**Source**: web.php:176-177
+
+---
+
+## Student Reports
+
+### GET /psico/student/{id}/report
+
+Displays the current report for a specific student.
+
+<ParamField path="/psico/student/{id}/report" type="GET">
+  Shows the active psychological report for the student.
+</ParamField>
+
+**Controller**: `PsicoController@current_report_student`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RolePsicoorientadorMiddleware`
+
+**Named Route**: `psico.student.report`
+
+**Required Role**: `psicoorientador`
+
+**URL Parameters**:
+- `id` (integer, required) - The student ID
+
+**Source**: web.php:179-180
+
+---
+
+### GET /report/student/{id}
+
+Displays the form to create a new student report.
+
+<ParamField path="/report/student/{id}" type="GET">
+  Shows the report creation form for a specific student.
+</ParamField>
+
+**Controller**: `PsicoController@report_student`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RolePsicoorientadorMiddleware`
+
+**Named Route**: `report.student`
+
+**Required Role**: `psicoorientador`
+
+**URL Parameters**:
+- `id` (integer, required) - The student ID for the report
+
+**Source**: web.php:182-183
+
+---
+
+### POST /store/report/student/{id}
+
+Creates a new psychological report for a student.
+
+<ParamField path="/store/report/student/{id}" type="POST">
+  Processes and stores a new psychological assessment report.
+</ParamField>
+
+**Controller**: `PsicoController@store_report_student`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RolePsicoorientadorMiddleware`
+
+**Named Route**: `store.report.student`
+
+**Required Role**: `psicoorientador`
+
+**URL Parameters**:
+- `id` (integer, required) - The student ID
+
+**Request Parameters**:
+- Report content
+- Observations
+- Recommendations
+- Assessment date
+
+**Source**: web.php:185-186
+
+---
+
+## Student History
+
+### GET /student/history/{id}
+
+Displays the complete historical record of a student.
+
+<ParamField path="/student/history/{id}" type="GET">
+  Shows chronological history of all referrals, reports, and interventions for a student.
+</ParamField>
+
+**Controller**: `PsicoController@show_student_history`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RolePsicoorientadorMiddleware`
+
+**Named Route**: `show.student.history`
+
+**Required Role**: `psicoorientador`
+
+**URL Parameters**:
+- `id` (integer, required) - The student ID
+
+**Source**: web.php:188-189
+
+---
+
+### GET /history/details/referral/{id}
+
+Displays historical referral details.
+
+<ParamField path="/history/details/referral/{id}" type="GET">
+  Shows detailed information about a past referral from student history.
+</ParamField>
+
+**Controller**: `PsicoController@history_details_referral`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RolePsicoorientadorMiddleware`
+
+**Named Route**: `history.details.referral`
+
+**Required Role**: `psicoorientador`
+
+**URL Parameters**:
+- `id` (integer, required) - The historical referral ID
+
+**Source**: web.php:191-192
+
+---
+
+### GET /history/details/report/{id}
+
+Displays historical report details.
+
+<ParamField path="/history/details/report/{id}" type="GET">
+  Shows detailed information about a past report from student history.
+</ParamField>
+
+**Controller**: `PsicoController@history_details_report`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RolePsicoorientadorMiddleware`
+
+**Named Route**: `history.details.report`
+
+**Required Role**: `psicoorientador`
+
+**URL Parameters**:
+- `id` (integer, required) - The historical report ID
+
+**Source**: web.php:194-195
+
+---
+
+### PUT /edit/history/details/referral/{id}
+
+Updates historical referral information.
+
+<ParamField path="/edit/history/details/referral/{id}" type="PUT">
+  Edits and updates information in a historical referral record.
+</ParamField>
+
+**Controller**: `PsicoController@update_history_details_referral`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RolePsicoorientadorMiddleware`
+
+**Named Route**: `update.history.details.referral`
+
+**Required Role**: `psicoorientador`
+
+**URL Parameters**:
+- `id` (integer, required) - The historical referral ID to update
+
+**Request Parameters**:
+- Updated referral information
+
+**Source**: web.php:197-198
+
+---
+
+### PUT /edit/history/details/report/{id}
+
+Updates historical report information.
+
+<ParamField path="/edit/history/details/report/{id}" type="PUT">
+  Edits and updates information in a historical report record.
+</ParamField>
+
+**Controller**: `PsicoController@update_history_details_report`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RolePsicoorientadorMiddleware`
+
+**Named Route**: `update.history.details.report`
+
+**Required Role**: `psicoorientador`
+
+**URL Parameters**:
+- `id` (integer, required) - The historical report ID to update
+
+**Request Parameters**:
+- Updated report information
+
+**Source**: web.php:200-201
+
+---
+
+## PIAR Assignment
+
+### PUT /accept/student
+
+Accepts a student into the PIAR program.
+
+<ParamField path="/accept/student" type="PUT">
+  Processes student acceptance into PIAR (Plan Individual de Ajustes Razonables).
+</ParamField>
+
+**Controller**: `PsicoController@accept_student_to_piar`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RolePsicoorientadorMiddleware`
+
+**Named Route**: `accept.student.to.piar`
+
+**Required Role**: `psicoorientador`
+
+**Request Parameters**:
+- Student identifier
+- PIAR assignment details
+
+<Warning>
+  This action changes the student's classification and may trigger additional support workflows.
+</Warning>
+
+**Source**: web.php:203-204
+
+---
+
+## Middleware Reference
+
+### RolePsicoorientadorMiddleware
+
+Restricts access to users with the `psicoorientador` role only.
+
+**Behavior**:
+- Checks if user is authenticated
+- Verifies user has `psicoorientador` role
+- Returns 403 Forbidden if role check fails
+
+**Error Message**: "No tienes permiso para acceder a esta página."
+
+**Source**: RolePsicoorientadorMiddleware.php:13-21
+
+---
+
+## Common Workflows
+
+### Processing New Referrals
+
+1. **View Referrals**: Use `GET /index/students/remitted/psico`
+2. **Review Details**: Access `GET /details/referral/{id}`
+3. **Update Status**: Submit changes via `PUT /edit/details/referral/{id}`
+4. **Create Report**: Use `GET /report/student/{id}` then `POST /store/report/student/{id}`
+5. **Assign to PIAR**: If needed, use `PUT /accept/student`
+
+### Student Monitoring
+
+1. **View Active Students**: Use `GET /psico/students/active`
+2. **Check PIAR Students**: Access `GET /psico/students/piar`
+3. **Review DUA Students**: Use `GET /psico/students/dua`
+4. **View Student History**: Access `GET /student/history/{id}`
+
+### Report Management
+
+1. **View Current Report**: Use `GET /psico/student/{id}/report`
+2. **Create New Report**: Access form at `GET /report/student/{id}`
+3. **Submit Report**: Post data via `POST /store/report/student/{id}`
+4. **Review Historical Reports**: Use `GET /history/details/report/{id}`
+5. **Update Historical Data**: Submit via `PUT /edit/history/details/report/{id}`

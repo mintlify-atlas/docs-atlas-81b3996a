@@ -1,0 +1,281 @@
+---
+title: Authentication Routes
+description: Public routes for user authentication, password reset, and session management
+---
+
+## Overview
+
+Authentication routes handle user login, logout, and password recovery. These routes are publicly accessible and do not require authentication middleware.
+
+## Login Routes
+
+### GET /
+
+Displays the login page.
+
+<ParamField path="/" type="GET">
+  Shows the login form for users to enter credentials.
+</ParamField>
+
+**Controller**: `AuthController@login`
+
+**Middleware**: None
+
+**Named Route**: `login`
+
+**Source**: web.php:27
+
+---
+
+### POST /
+
+Authenticates user credentials and creates a session.
+
+<ParamField path="/" type="POST">
+  Processes login credentials and establishes user session.
+</ParamField>
+
+**Controller**: `AuthController@authenticate`
+
+**Middleware**: None
+
+**Named Route**: `authenticate`
+
+**Request Parameters**:
+- Email/username
+- Password
+
+**Source**: web.php:28
+
+---
+
+### GET /logout
+
+Terminates the user session and logs out the current user.
+
+<ParamField path="/logout" type="GET">
+  Destroys the current session and redirects to login.
+</ParamField>
+
+**Controller**: `AuthController@logout`
+
+**Middleware**: None
+
+**Named Route**: `logout`
+
+**Source**: web.php:29
+
+---
+
+## Password Recovery Routes
+
+### GET /forgot-password
+
+Displays the password recovery form.
+
+<ParamField path="/forgot-password" type="GET">
+  Shows the form to request a password reset link.
+</ParamField>
+
+**Controller**: `AuthController@showForgotPasswordForm`
+
+**Middleware**: None
+
+**Named Route**: `password.request`
+
+**Source**: web.php:37-38
+
+---
+
+### POST /forgot-password
+
+Sends a password reset link to the user's email.
+
+<ParamField path="/forgot-password" type="POST">
+  Processes the password reset request and emails the reset link.
+</ParamField>
+
+**Controller**: `AuthController@sendResetLink`
+
+**Middleware**: None
+
+**Named Route**: `password.email`
+
+**Request Parameters**:
+- Email address
+
+**Source**: web.php:40-41
+
+---
+
+## Password Reset Routes
+
+### GET /reset-password/{token}
+
+Displays the password reset form with a valid token.
+
+<ParamField path="/reset-password/{token}" type="GET">
+  Shows the form to enter a new password using the reset token.
+</ParamField>
+
+**Controller**: `AuthController@showResetPasswordForm`
+
+**Middleware**: None
+
+**Named Route**: `password.reset`
+
+**URL Parameters**:
+- `token` (string, required) - The password reset token from email
+
+**Source**: web.php:49-50
+
+---
+
+### POST /reset-password
+
+Updates the user's password with the new credentials.
+
+<ParamField path="/reset-password" type="POST">
+  Processes the password reset and updates the user's credentials.
+</ParamField>
+
+**Controller**: `AuthController@resetPassword`
+
+**Middleware**: None
+
+**Named Route**: `password.update`
+
+**Request Parameters**:
+- Token
+- Email
+- New password
+- Password confirmation
+
+**Source**: web.php:52-53
+
+---
+
+## Common Routes (All Authenticated Users)
+
+<Note>
+  The following routes are available to all authenticated users regardless of role.
+</Note>
+
+### GET /dashboard
+
+Displays the main dashboard homepage.
+
+<ParamField path="/dashboard" type="GET">
+  Shows the main dashboard view after successful login.
+</ParamField>
+
+**Middleware**: 
+- `PreventBackHistoryMiddleware` - Prevents browser back button caching
+- `auth` - Requires authentication
+
+**Named Route**: `dashboard`
+
+**Source**: web.php:65-67
+
+---
+
+### GET /mi-perfil
+
+Displays the user profile page.
+
+<ParamField path="/mi-perfil" type="GET">
+  Shows the current user's profile information.
+</ParamField>
+
+**Controller**: `ProfileController@index`
+
+**Middleware**: 
+- `PreventBackHistoryMiddleware`
+- `auth`
+
+**Named Route**: `profile`
+
+**Source**: web.php:70-71
+
+---
+
+### PUT /mi-perfil/email
+
+Updates the user's email address.
+
+<ParamField path="/mi-perfil/email" type="PUT">
+  Updates the authenticated user's email address.
+</ParamField>
+
+**Controller**: `ProfileController@updateEmail`
+
+**Middleware**: 
+- `PreventBackHistoryMiddleware`
+- `auth`
+
+**Named Route**: `profile.update.email`
+
+**Request Parameters**:
+- New email address
+
+**Source**: web.php:73-75
+
+---
+
+### PUT /profile/photo
+
+Updates the user's profile photo.
+
+<ParamField path="/profile/photo" type="PUT">
+  Uploads and updates the authenticated user's profile photo.
+</ParamField>
+
+**Controller**: `ProfileController@updatePhoto`
+
+**Middleware**: 
+- `PreventBackHistoryMiddleware`
+- `auth`
+
+**Named Route**: `profile.update.photo`
+
+**Request Parameters**:
+- Photo file (image upload)
+
+**Source**: web.php:77-79
+
+---
+
+### DELETE /profile/photo
+
+Removes the user's profile photo.
+
+<ParamField path="/profile/photo" type="DELETE">
+  Deletes the authenticated user's profile photo.
+</ParamField>
+
+**Controller**: `ProfileController@deletePhoto`
+
+**Middleware**: 
+- `PreventBackHistoryMiddleware`
+- `auth`
+
+**Named Route**: `profile.delete.photo`
+
+**Source**: web.php:81-83
+
+---
+
+## Middleware Reference
+
+<Warning>
+  All protected routes require the `PreventBackHistoryMiddleware` and `auth` middleware. This prevents users from accessing pages via browser back button after logout.
+</Warning>
+
+### PreventBackHistoryMiddleware
+
+Prevents browser caching by setting appropriate headers:
+- `Cache-Control: no-store, no-cache, must-revalidate, max-age=0`
+- `Pragma: no-cache`
+- `Expires: Fri, 01 Jan 1990 00:00:00 GMT`
+
+**Source**: PreventBackHistoryMiddleware.php:16-26

@@ -1,0 +1,386 @@
+---
+title: Teacher Role
+description: Complete guide to the teacher role capabilities, student referral system, and classroom management features
+---
+
+## Overview
+
+The **Teacher** (Docente) role enables educators to refer students to the psychologist, track their referrals, and manage student information. Teachers work directly with students and serve as the primary entry point for the student support system.
+
+<Note>
+  Teachers can create student referrals and update student information for students in their assigned groups.
+</Note>
+
+## Role Verification
+
+The teacher role is protected by the `RoleDocenteMiddleware`:
+
+```php
+// app/Http/Middleware/RoleDocenteMiddleware.php:15
+if (!Auth::check() || !Auth::user()->hasRole('docente')) {
+    abort(403, 'No tienes permiso para acceder a esta página.');
+}
+```
+
+## Core Capabilities
+
+<CardGroup cols={2}>
+  <Card title="Student Referrals" icon="paper-plane">
+    Submit students to the psychologist with detailed observations
+  </Card>
+  <Card title="Referral Tracking" icon="list-check">
+    Monitor the status of submitted referrals
+  </Card>
+  <Card title="Student Management" icon="user-edit">
+    Edit student information for active referrals
+  </Card>
+  <Card title="PIAR/DUA Support" icon="file-medical">
+    Add minutes for students in PIAR or DUA processes
+  </Card>
+</CardGroup>
+
+## Student Referral System
+
+Teachers can refer students who need psychological support or special educational attention.
+
+### Creating a Referral
+
+**Route:** `/create/referral` (GET)
+
+**Controller:** `CreateReferralController@create_referral` (source/app/Http/Controllers/CreateReferralController.php:22)
+
+<Accordion title="Referral Form Fields">
+  **Student Information:**
+  - Document number (unique identifier)
+  - Full name (first and last name)
+  - Age (optional)
+  - Degree (grade level)
+  - Group (class section)
+  
+  **Referral Details:**
+  - Reason for referral (required)
+  - Observations (required)
+  - Strategies already attempted (required)
+  
+  **Validation:**
+  ```php
+  'number_documment' => 'required|digits_between:1,20'
+  'name' => 'required'
+  'last_name' => 'required'
+  'degree' => 'required'
+  'group' => 'required'
+  'age' => 'nullable|integer|min:0'
+  'reason_referral' => 'required|string'
+  'observation' => 'required|string'
+  'strategies' => 'required|string'
+  ```
+</Accordion>
+
+### Referral Submission Process
+
+**Route:** `/store/referral` (POST)
+
+**Controller:** `CreateReferralController@store_referral` (source/app/Http/Controllers/CreateReferralController.php:32)
+
+When a teacher submits a referral:
+
+<Steps>
+  <Step title="Student Validation">
+    The system checks if the student already exists in the database. If the student is already in the system:
+    - **Active state:** Cannot be referred again (already under review)
+    - **PIAR state:** Cannot be referred (already in PIAR process)
+    - **DUA state:** Cannot be referred (already in DUA process)
+  </Step>
+  
+  <Step title="Psychologist Assignment">
+    The system automatically assigns the appropriate psychologist based on the student's degree:
+    
+    ```php
+    // app/Http/Controllers/CreateReferralController.php:52
+    $degreeLoad = Users_load_degree::where('id_degree', $request->input('degree'))->first();
+    
+    if (!$degreeLoad) {
+        return redirect()->back()->with('error', 
+            'No se encontró un psicoorientador asignado para el grado seleccionado');
+    }
+    ```
+  </Step>
+  
+  <Step title="Student Record Creation">
+    A new student record is created with:
+    - Personal information
+    - Academic placement (degree and group)
+    - Reference to the referring teacher (`sent_by`)
+    - Initial state set to 'activo'
+    - Automatic role assignment as 'estudiante'
+  </Step>
+  
+  <Step title="Referral Record">
+    A referral record is created linking:
+    - The student
+    - The referring teacher
+    - Reason, observations, and strategies
+    - Course information
+  </Step>
+  
+  <Step title="Email Notification">
+    The assigned psychologist receives an automatic email notification:
+    
+    ```php
+    // app/Http/Controllers/CreateReferralController.php:117
+    Mail::to($psico_date->email)->queue(new CreatedReferralMail($user, $referral));
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  If no psychologist is assigned to the selected degree level, the referral will fail. Contact the coordinator to assign a psychologist.
+</Warning>
+
+## Tracking Referrals
+
+### Viewing Submitted Referrals
+
+**Route:** `/index/students/remitted` (GET)
+
+**Controller:** `CreateReferralController@index_student_remitted` (source/app/Http/Controllers/CreateReferralController.php:130)
+
+Teachers can view all students they have referred who are currently in 'activo' state.
+
+**Features:**
+- Paginated list (15 students per page)
+- Search by name, last name, or document number
+- View latest referral information
+- See student's group and degree
+- Ordered alphabetically by name
+
+```php
+// app/Http/Controllers/CreateReferralController.php:135
+$query = Users_student::whereHas('states', function ($q) {
+    $q->whereIn('state', ['activo']);
+})->where('sent_by', $id_teacher);
+```
+
+<Note>
+  Only students referred by the authenticated teacher are displayed. Teachers cannot see referrals made by other teachers.
+</Note>
+
+## Student Management
+
+### Editing Student Information
+
+**Route:** `/edit/student/{id}` (GET)
+
+**Controller:** `CreateReferralController@edit_student` (source/app/Http/Controllers/CreateReferralController.php:161)
+
+Teachers can update student information for active referrals.
+
+**Editable Fields:**
+- Document number
+- Name and last name
+- Age
+- Degree and group assignment
+
+**Route:** `/update/student/{id}` (PUT)
+
+**Controller:** `CreateReferralController@update_student` (source/app/Http/Controllers/CreateReferralController.php:172)
+
+<Accordion title="Update Logic">
+  The system tracks changes to prevent unnecessary database updates:
+  
+  ```php
+  // app/Http/Controllers/CreateReferralController.php:196
+  foreach ($nuevos_datos as $key => $value) {
+      if ($datos_actuales[$key] != $value) {
+          $huboCambios = true;
+          break;
+      }
+  }
+  
+  if ($huboCambios) {
+      $student->update($nuevos_datos);
+      return redirect()->back()->with('success', 'Usuario editado correctamente.');
+  } else {
+      return redirect()->back()->with('info', 'No hubo cambios en el usuario.');
+  }
+  ```
+</Accordion>
+
+<Warning>
+  When changing a student's degree, ensure a psychologist is assigned to that degree level, or the update will fail.
+</Warning>
+
+## PIAR/DUA Support
+
+### Adding Minutes
+
+**Route:** `/addMinutes` (GET)
+
+**Controller:** `CreateReferralController@addMinutes` (source/app/Http/Controllers/CreateReferralController.php:222)
+
+Teachers can view and add minutes (actas) for students in PIAR or DUA processes who are in their assigned groups.
+
+**Access Criteria:**
+- Student must be in 'en PIAR' or 'en DUA' state
+- Student must be in a group the teacher is assigned to
+- Teacher assignment is validated through `users_load_groups` table
+
+```php
+// app/Http/Controllers/CreateReferralController.php:225
+$id_load_groups = Users_load_group::where('id_user_teacher', $id_teacher)
+    ->pluck('id_group');
+
+$query = Users_student::whereHas('states', function ($q) {
+    $q->whereIn('state', ['en PIAR', 'en DUA']);
+})->whereIn('id_group', $id_load_groups);
+```
+
+## Shared Routes with Psychologist
+
+Some routes are accessible to both teachers and psychologists through the `RolePsicoorientadorAndDocenteMiddleware`:
+
+```php
+// routes/web.php:137
+Route::middleware([RolePsicoorientadorAndDocenteMiddleware::class])->group(function () {
+    
+    Route::get('/create/referral', [CreateReferralController::class, 'create_referral']);
+    Route::post('/store/referral', [CreateReferralController::class, 'store_referral']);
+    Route::get('/edit/student/{id}', [CreateReferralController::class, 'edit_student']);
+    Route::put('/update/student/{id}', [CreateReferralController::class, 'update_student']);
+});
+```
+
+This allows psychologists to also create referrals and edit student information.
+
+## Protected Routes
+
+Routes exclusively for teachers (protected by `RoleDocenteMiddleware`):
+
+```php
+// routes/web.php:122
+Route::middleware([RoleDocenteMiddleware::class])->group(function () {
+    
+    Route::get('/index/students/remitted', 
+        [CreateReferralController::class, 'index_student_remitted']);
+    
+    Route::get('/addMinutes', 
+        [CreateReferralController::class, 'addMinutes']);
+});
+```
+
+## Teacher Assignment Structure
+
+Teachers are assigned to multiple groups and areas by the coordinator:
+
+### Database Relationships
+
+```php
+// app/Models/Users_teacher.php:66
+public function groups()
+{
+    return $this->belongsToMany(
+        Group::class,
+        'teachers_areas_groups',
+        'id_teacher',
+        'id_group'
+    )->withPivot('id_area');
+}
+
+public function areas()
+{
+    return $this->belongsToMany(
+        Area::class,
+        'teachers_areas_groups',
+        'id_teacher',
+        'id_area'
+    )->withPivot('id_group');
+}
+```
+
+### Group Director
+
+Teachers can optionally be designated as a group director:
+
+```php
+// app/Models/Users_teacher.php:45
+public function director()
+{
+    return $this->belongsTo(Group::class, 'group_director');
+}
+```
+
+Group directors have the same permissions as regular teachers but may have additional responsibilities defined by the institution.
+
+## Common Workflows
+
+<Steps>
+  <Step title="Identify Student Need">
+    Observe student behavior, academic performance, or social-emotional challenges in the classroom.
+  </Step>
+  
+  <Step title="Attempt Strategies">
+    Implement classroom-level interventions and document them.
+  </Step>
+  
+  <Step title="Create Referral">
+    Navigate to `/create/referral` and complete the referral form with:
+    - Detailed reason for referral
+    - Specific observations
+    - Strategies already attempted
+  </Step>
+  
+  <Step title="Monitor Status">
+    Check `/index/students/remitted` to see if the psychologist has reviewed the referral.
+  </Step>
+  
+  <Step title="Collaborate">
+    Once the student moves to PIAR or DUA, add minutes through `/addMinutes` to document ongoing support.
+  </Step>
+</Steps>
+
+## Error Handling
+
+<AccordionGroup>
+  <Accordion title="No Psychologist Assigned">
+    **Error:** "No se encontró un psicoorientador asignado para el grado seleccionado"
+    
+    **Solution:** Contact the coordinator to assign a psychologist to the degree level.
+  </Accordion>
+  
+  <Accordion title="Student Already Referred">
+    **Info:** "El estudiante ya fue remitido y está en revisión por el psicoorientador"
+    
+    **Explanation:** The student is already in the system with an active referral. Check the referral list to see the status.
+  </Accordion>
+  
+  <Accordion title="Student in PIAR Process">
+    **Info:** "El estudiante ya está en proceso PIAR"
+    
+    **Explanation:** The student has already been evaluated and is receiving PIAR support. Use the `addMinutes` feature instead.
+  </Accordion>
+  
+  <Accordion title="Student in DUA Process">
+    **Info:** "El estudiante ya está en proceso DUA"
+    
+    **Explanation:** The student is receiving DUA support. Use the `addMinutes` feature to contribute documentation.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Note>
+  - Document interventions thoroughly before referring
+  - Be specific in observations (dates, contexts, behaviors)
+  - Include strategies attempted and their outcomes
+  - Keep student information up-to-date
+  - Check referral status regularly
+  - Collaborate with assigned psychologist
+  - Use search functionality to quickly find students
+</Note>
+
+## Related Documentation
+
+- [Psychologist Role](/roles/psychologist)
+- [Coordinator Role](/roles/coordinator)
+- [Referral System](/features/referrals)
+- [Student Management](/features/students)

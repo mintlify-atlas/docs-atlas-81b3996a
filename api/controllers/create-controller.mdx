@@ -1,0 +1,405 @@
+---
+title: 'CreateController'
+description: 'Controller for academic coordinator user management including teachers and psychologists'
+---
+
+## Overview
+
+The `CreateController` handles the creation, editing, listing, and status management of system users (teachers and psychologists). This controller is used by academic coordinators to manage staff accounts, assign roles, groups, areas, and degrees.
+
+**Namespace:** `App\Http\Controllers`
+
+**File:** `app/Http/Controllers/CreateController.php`
+
+---
+
+## User Creation
+
+### create_user()
+
+Displays the user creation form with available options.
+
+```php
+public function create_user()
+```
+
+**Returns:** View `academic.createUser`
+
+**Data Provided:**
+- `groups` - All groups ordered numerically
+- `areas` - All areas ordered alphabetically
+- `degrees` - All degrees ordered numerically
+- `roles` - Available roles (excludes "estudiante" and "coordinador")
+
+---
+
+### store_user()
+
+Creates a new teacher or psychologist user account. Handles different logic based on role.
+
+```php
+public function store_user(Request $request)
+```
+
+<ParamField body="role" type="integer" required>
+  Role ID (must exist in roles table)
+</ParamField>
+
+#### Common Fields
+
+<ParamField body="number_documment" type="string" required>
+  Document number (1-11 digits, unique for new users)
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  User's first name
+</ParamField>
+
+<ParamField body="last_name" type="string" required>
+  User's last name
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  Email address (must be unique)
+</ParamField>
+
+---
+
+#### For Teachers (role = "docente")
+
+<ParamField body="areas" type="array" required>
+  Array of area IDs the teacher is responsible for
+</ParamField>
+
+<ParamField body="groups" type="array" required>
+  Array of group IDs the teacher manages
+</ParamField>
+
+<ParamField body="group_director" type="integer">
+  Group ID if teacher is a group director (must be unique)
+</ParamField>
+
+<ParamField body="area_id" type="array" required>
+  Array of area IDs for area-group assignments
+</ParamField>
+
+<ParamField body="groups_asig" type="object" required>
+  Nested array mapping area IDs to arrays of group IDs where each area is taught
+  
+  Example: `{"1": [3, 5], "2": [3, 4]}` means area 1 is taught in groups 3 and 5
+</ParamField>
+
+**Teacher Business Logic:**
+
+1. Validates all assigned groups in `groups_asig` exist in the `groups` array
+2. Checks that each area-group combination isn't already assigned to another teacher
+3. Creates user with password hashed from document number
+4. Assigns "docente" role
+5. Inserts records into:
+   - `users_load_areas` - Teacher's areas
+   - `users_load_groups` - Teacher's groups
+   - `teachers_areas_groups` - Area-group teaching assignments
+
+<Note>
+  If a user with the document number already exists, only email and assignments are validated and updated. The commented code shows this was previously implemented but is currently disabled.
+</Note>
+
+---
+
+#### For Psychologists (role = "psicoorientador")
+
+<ParamField body="load_degree" type="array" required>
+  Array of degree IDs assigned to the psychologist
+</ParamField>
+
+**Psychologist Business Logic:**
+
+1. Validates that none of the degrees are already assigned to another psychologist
+2. Creates user account with document number as password
+3. Assigns "psicoorientador" role
+4. Inserts degree assignments into `users_load_degrees`
+
+**Existing User Handling:**
+- If user exists, updates email and state to "activo"
+- Validates and assigns new degrees
+
+**Returns:**
+- Success: Redirects with success message
+- Error: Redirects with specific error message (duplicate assignments, validation failures, etc.)
+
+---
+
+## User Listing
+
+### index_users()
+
+Lists all teachers and psychologists with filtering and search capabilities.
+
+```php
+public function index_users(Request $request)
+```
+
+<ParamField query="estado" type="string">
+  Filter by state: "activo", "suspendido", or "todos" (all)
+</ParamField>
+
+<ParamField query="search" type="string">
+  Search term to filter by:
+  - Name
+  - Last name
+  - Document number
+  - Full name (concatenated)
+  - Area name
+</ParamField>
+
+**Returns:** View `academic.userList`
+
+**Data Provided:**
+- Paginated users (15 per page)
+- User relationships:
+  - Groups
+  - Areas
+  - Roles
+  - State
+  - Degree assignments (for psychologists)
+- `userRoles` - Map of user IDs to role names
+
+**Ordering:** By name, then last name
+
+**Query String Persistence:** Maintains filters across pagination
+
+---
+
+## User Editing
+
+### edit_user()
+
+Displays the edit form for a teacher or psychologist.
+
+```php
+public function edit_user(string $id)
+```
+
+<ParamField path="id" type="string" required>
+  User ID
+</ParamField>
+
+**Returns:** View `academic.userEdit`
+
+**Data Provided:**
+- `user` - User record
+- `roles` - Available roles
+- `areas` - All areas
+- `selectedAreas` - User's current areas with IDs and names
+- `groups` - All groups
+- `selectedGroups` - User's current group IDs
+- `degrees` - All degrees
+- `selectedDegrees` - User's current degree IDs (for psychologists)
+- `groupsForArea` - For each area, the groups where the teacher teaches that area
+
+**Group-Area Mapping Structure:**
+```json
+[
+  {
+    "area_id": 1,
+    "groups": [
+      {"id": 3, "group": "10A"},
+      {"id": 5, "group": "11B"}
+    ]
+  }
+]
+```
+
+---
+
+### update_user()
+
+Updates a teacher or psychologist account. Only saves changes if modifications are detected.
+
+```php
+public function update_user(Request $request, string $id)
+```
+
+<ParamField path="id" type="string" required>
+  User ID
+</ParamField>
+
+#### For Teachers
+
+<ParamField body="number_documment" type="string" required>
+  Document number (1-20 digits, unique except current user)
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  First name
+</ParamField>
+
+<ParamField body="last_name" type="string" required>
+  Last name
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  Email (unique except current user)
+</ParamField>
+
+<ParamField body="areas" type="array" required>
+  Array of area IDs
+</ParamField>
+
+<ParamField body="groups" type="array" required>
+  Array of group IDs
+</ParamField>
+
+<ParamField body="group_director" type="integer">
+  Group director assignment (unique except current user)
+</ParamField>
+
+<ParamField body="area_id" type="array" required>
+  Array of area IDs for assignments
+</ParamField>
+
+<ParamField body="groups_asig" type="object" required>
+  Area-to-groups mapping
+</ParamField>
+
+**Teacher Update Logic:**
+
+1. Compares current data with new data to detect changes
+2. Validates:
+   - Groups in `groups_asig` exist in `groups` array
+   - Area-group combinations aren't assigned to other teachers
+3. If changes detected:
+   - Wraps updates in database transaction
+   - Deletes all existing assignments
+   - Inserts new assignments to:
+     - `users_load_areas`
+     - `users_load_groups`
+     - `teachers_areas_groups`
+   - Updates user basic information
+
+**Returns:**
+- Success: "Usuario actualizado correctamente"
+- Info: "No hubo cambios en la actualización del usuario" (no changes)
+- Error: Specific error message
+
+---
+
+#### For Psychologists
+
+<ParamField body="number_documment" type="string" required>
+  Document number (1-20 digits)
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  First name
+</ParamField>
+
+<ParamField body="last_name" type="string" required>
+  Last name
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  Email address
+</ParamField>
+
+<ParamField body="load_degree" type="array" required>
+  Array of degree IDs
+</ParamField>
+
+**Psychologist Update Logic:**
+
+1. Detects changes in basic info or degree assignments
+2. If changes detected:
+   - Wraps in transaction
+   - Deletes existing degree assignments
+   - Inserts new degree assignments
+   - Updates user information
+
+**Returns:**
+- Success: "Usuario actualizado correctamente"
+- Info: "No hubo cambios en la actualización del usuario"
+
+---
+
+## User Status Management
+
+### destroy_user()
+
+Toggles user status between active (id_state = 1) and suspended (id_state = 2).
+
+```php
+public function destroy_user($id)
+```
+
+<ParamField path="id" type="integer" required>
+  User ID
+</ParamField>
+
+**Business Logic:**
+- If user is active (state 1) → suspends (sets to state 2)
+- If user is suspended (state 2) → activates (sets to state 1)
+
+**Returns:**
+- "Usuario suspendido correctamente" when suspending
+- "Usuario activado correctamente" when activating
+
+<Note>
+  This is a soft suspension mechanism. Users are not deleted from the database.
+</Note>
+
+---
+
+## Database Tables Referenced
+
+### Primary Tables
+- `users_teachers` - Teacher and psychologist records
+- `roles` - User roles (Spatie permissions)
+- `states` - User states (activo, suspendido)
+
+### Assignment Tables
+- `users_load_areas` - Teacher-area assignments
+- `users_load_groups` - Teacher-group assignments
+- `users_load_degrees` - Psychologist-degree assignments
+- `teachers_areas_groups` - Area-group teaching assignments
+
+### Reference Tables
+- `areas` - Subject areas
+- `groups` - Student groups/classes
+- `degrees` - Academic degrees/grades
+
+---
+
+## Validation Rules Summary
+
+### Document Number
+- New users: 1-11 digits, unique
+- Updates: 1-20 digits, unique except current user
+
+### Email
+- Must be unique (except for current user in updates)
+
+### Arrays
+- All area/group/degree IDs must exist in respective tables
+- Area-group combinations must not conflict with other teachers
+- Degrees must not be assigned to multiple psychologists
+
+### Group Director
+- Optional field
+- Must be unique if provided
+
+---
+
+## Transaction Safety
+
+Both creation and update operations for teachers use database transactions to ensure:
+- All related records are created/updated atomically
+- Rollback on any error
+- Data consistency across multiple tables
+
+## Default Password
+
+New users receive a password equal to their document number (bcrypt hashed). Users should change this on first login.
+
+## Authentication
+
+All methods require academic coordinator authentication and appropriate permissions.

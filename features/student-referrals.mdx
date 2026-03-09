@@ -1,0 +1,283 @@
+---
+title: Student Referrals
+description: Manage student referrals to the psycho-orientation team for comprehensive support and evaluation.
+---
+
+## Overview
+
+The Student Referral system allows teachers to submit students who need psychological support or special attention to the psycho-orientation team. Each referral includes detailed information about the student, the reason for referral, observations, and strategies already attempted.
+
+## Referral Model
+
+The `Referral` model (`app/Models/Referral.php:8`) stores all referral information:
+
+```php
+protected $fillable = [
+    'id_user_student',
+    'id_user_teacher',
+    'reason',
+    'observation',
+    'strategies',
+    'annex_one',
+    'course',
+];
+```
+
+### Key Fields
+
+<AccordionGroup>
+  <Accordion title="id_user_student">
+    Foreign key linking to the `users_students` table. Identifies which student is being referred.
+  </Accordion>
+  
+  <Accordion title="id_user_teacher">
+    Foreign key linking to the `users_teachers` table. Identifies which teacher created the referral.
+  </Accordion>
+  
+  <Accordion title="reason">
+    The primary reason for referring the student (e.g., behavioral issues, learning difficulties, emotional concerns).
+  </Accordion>
+  
+  <Accordion title="observation">
+    Detailed observations from the teacher about the student's situation, behaviors, or challenges.
+  </Accordion>
+  
+  <Accordion title="strategies">
+    Strategies the teacher has already attempted before making the referral.
+  </Accordion>
+  
+  <Accordion title="annex_one">
+    Optional file attachment for supporting documentation.
+  </Accordion>
+  
+  <Accordion title="course">
+    The student's current course/grade level.
+  </Accordion>
+</AccordionGroup>
+
+## Creating a Referral
+
+### Teacher Workflow
+
+<Steps>
+  <Step title="Access Referral Form">
+    Teachers navigate to `/create/referral` to access the student referral form.
+    
+    ```php
+    // Route: routes/web.php:139
+    Route::get('/create/referral', [CreateReferralController::class, 'create_referral'])
+        ->name('create.referral');
+    ```
+  </Step>
+  
+  <Step title="Fill Out Student Information">
+    Enter the student's basic information:
+    - Document number (required, 1-20 digits)
+    - Full name (first and last name)
+    - Age (optional)
+    - Degree and group
+  </Step>
+  
+  <Step title="Provide Referral Details">
+    Document the referral information:
+    - **Reason for referral**: Primary concern requiring support
+    - **Observations**: Detailed description of behaviors or situations
+    - **Strategies**: What has already been tried
+  </Step>
+  
+  <Step title="Submit Referral">
+    The system validates and creates both the student record and the referral record in a database transaction.
+  </Step>
+</Steps>
+
+### Backend Processing
+
+The `store_referral` method (`app/Http/Controllers/CreateReferralController.php:32`) handles referral submission:
+
+```php
+public function store_referral(Request $request)
+{
+    $id_teacher = Auth::id();
+    $state = State::where('state', 'activo')->firstOrFail();
+    
+    // Validation
+    $request->validate([
+        'number_documment' => 'required|digits_between:1,20',
+        'name' => 'required',
+        'last_name' => 'required',
+        'degree' => 'required',
+        'group' => 'required',
+        'age' => 'nullable|integer|min:0',
+        'reason_referral' => 'required|string',
+        'observation' => 'required|string',
+        'strategies' => 'required|string',
+    ]);
+    
+    // Check if student already exists and their current state
+    $exist_student = Users_student::with('degree', 'group')
+        ->where('number_documment', $input_number_documment)
+        ->first();
+    
+    // Create student and referral records
+    DB::beginTransaction();
+    try {
+        $user = new Users_student();
+        // ... student creation
+        
+        $referral = new Referral();
+        $referral->id_user_student = $user->id;
+        $referral->id_user_teacher = $id_teacher;
+        $referral->reason = $request->reason_referral;
+        $referral->observation = $request->observation;
+        $referral->strategies = $request->strategies;
+        $referral->course = $degreeName;
+        $referral->save();
+        
+        // Send email notification to psychologist
+        Mail::to($psico_date->email)->queue(new CreatedReferralMail($user, $referral));
+        
+        DB::commit();
+    } catch (\Exception $e) {
+        DB::rollback();
+    }
+}
+```
+
+<Note>
+  When a referral is created, the system automatically:
+  1. Assigns the student an "activo" (active) state
+  2. Identifies the appropriate psychologist based on the student's grade
+  3. Sends an email notification to the assigned psychologist
+</Note>
+
+## State Validation
+
+The system prevents duplicate referrals by checking the student's current state (`app/Http/Controllers/CreateReferralController.php:67`):
+
+- **activo**: Student already referred and under review
+- **en PIAR**: Student in PIAR process
+- **en DUA**: Student in DUA process
+
+```php
+if ($state_info->state === 'activo') {
+    return redirect()->back()->with(
+        'info',
+        'El estudiante ya fue remitido y está en revisión por el psicoorientador.'
+    );
+} elseif ($state_info->state === 'en PIAR') {
+    return redirect()->back()->with(
+        'info',
+        'El estudiante ya está en proceso PIAR.'
+    );
+}
+```
+
+## Viewing Referrals
+
+### Teacher View
+
+Teachers can view their submitted referrals at `/index/students/remitted` (`app/Http/Controllers/CreateReferralController.php:130`):
+
+```php
+public function index_student_remitted(Request $request)
+{
+    $id_teacher = Auth::id();
+    
+    // Get students with 'activo' state sent by this teacher
+    $query = Users_student::whereHas('states', function ($q) {
+        $q->whereIn('state', ['activo']);
+    })->where('sent_by', $id_teacher);
+    
+    // Apply search filter
+    if ($request->filled('search')) {
+        $searchTerm = $request->input('search');
+        $query->where(function ($q) use ($searchTerm) {
+            $q->where('name', 'LIKE', '%' . $searchTerm . '%')
+                ->orWhere('last_name', 'LIKE', '%' . $searchTerm . '%')
+                ->orWhere('number_documment', 'LIKE', '%' . $searchTerm . '%');
+        });
+    }
+    
+    $students = $query->with('latestReferral', 'group', 'degree')
+        ->orderBy('name', 'asc')
+        ->paginate(15);
+}
+```
+
+### Psychologist View
+
+Psychologists can view all referrals assigned to their grades at `/index/students/remitted/psico` (`app/Http/Controllers/PsicoController.php:114`).
+
+## Editing Referrals
+
+Teachers can edit student information before the psychologist reviews the case (`app/Http/Controllers/CreateReferralController.php:172`):
+
+<CardGroup cols={2}>
+  <Card title="Editable Fields" icon="pencil">
+    - Document number
+    - Name and last name
+    - Age
+    - Degree and group
+  </Card>
+  
+  <Card title="Protected Fields" icon="lock">
+    - Referral reason
+    - Observations
+    - Strategies
+    - Student state
+  </Card>
+</CardGroup>
+
+## Relationships
+
+The Referral model has two key relationships (`app/Models/Referral.php:25`):
+
+```php
+// Relationship with student
+public function user_student() {
+    return $this->belongsTo(Users_student::class, 'id_user_student');
+}
+
+// Relationship with teacher
+public function user_teacher() {
+    return $this->belongsTo(Users_teacher::class, 'id_user_teacher');
+}
+```
+
+## Email Notifications
+
+When a referral is created, the system sends an automated email to the assigned psychologist using Laravel's queue system (`app/Http/Controllers/CreateReferralController.php:117`):
+
+```php
+Mail::to($psico_date->email)->queue(new CreatedReferralMail($user, $referral));
+```
+
+<Warning>
+  The system requires that each grade has an assigned psychologist in the `users_load_degrees` table. If no psychologist is assigned, the referral cannot be created.
+</Warning>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Document Thoroughly" icon="file-lines">
+    Provide detailed observations and document all strategies attempted before referral.
+  </Card>
+  
+  <Card title="Timely Submission" icon="clock">
+    Submit referrals promptly when concerns arise to ensure timely intervention.
+  </Card>
+  
+  <Card title="Follow Up" icon="arrows-rotate">
+    Monitor the referral status and communicate with the psychologist as needed.
+  </Card>
+  
+  <Card title="Privacy" icon="shield">
+    Handle all student information with confidentiality and professionalism.
+  </Card>
+</CardGroup>
+
+## Related Features
+
+- [Psycho-Orientation Reports](/features/psycho-orientation)
+- [User Management](/features/user-management)
+- [PIAR Management](/features/piar-dua-management)

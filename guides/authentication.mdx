@@ -1,0 +1,376 @@
+---
+title: "Authentication"
+description: "Login, password management, and session security for the Bethlemitas system"
+---
+
+## Overview
+
+The Bethlemitas Student Support System uses Laravel's built-in authentication with custom role-based access control. This guide covers login procedures, password recovery, and security features.
+
+## Login Process
+
+### Accessing the System
+
+Navigate to the root URL (`/`) to access the login page.
+
+**Route:** `GET /`
+
+```php AuthController.php:15-17
+public function login() {
+    return view('auth.login');
+}
+```
+
+### Authentication Credentials
+
+Users authenticate with:
+
+<ParamField path="number_documment" type="string" required>
+  User's document number (ID number)
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  User's password
+</ParamField>
+
+<Note>
+The system uses **document number** as the username, not email. This is common in Colombian educational systems.
+</Note>
+
+## Authentication Logic
+
+The `authenticate()` method handles login validation:
+
+```php AuthController.php:27-56
+public function authenticate(Request $request) {
+
+    $request->validate([
+        'number_documment' => 'required',
+        'password' => 'required',
+    ]);
+
+    // Only allow login if id_state = 1 (active)
+    if (Auth::attempt([
+        'number_documment' => $request->number_documment,
+        'password' => $request->password,
+        'id_state' => 1
+    ])) {
+        return redirect()->route('dashboard');
+    }
+
+    // Check if user exists but is suspended
+    $user = Users_teacher::where('number_documment', $request->number_documment)->first();
+
+    if ($user && $user->id_state != 1) {
+        return back()->withErrors([
+            'blocked' => 'Tu cuenta se encuentra suspendida. Comunícate con el Director.'
+        ]);
+    }
+
+    // Invalid credentials
+    return back()
+        ->withErrors(['invalid_credentials' => 'Número de documento ó contraseña son incorrectas'])
+        ->withInput();
+}
+```
+
+### Authentication States
+
+<Tabs>
+  <Tab title="Successful Login">
+    User credentials are valid **and** `id_state = 1` (active):
+    - Session is created
+    - User redirected to `/dashboard`
+  </Tab>
+  <Tab title="Suspended Account">
+    User exists but `id_state != 1` (suspended):
+    - Login denied
+    - Error: "Tu cuenta se encuentra suspendida. Comunícate con el Director."
+  </Tab>
+  <Tab title="Invalid Credentials">
+    Document number or password incorrect:
+    - Login denied
+    - Error: "Número de documento ó contraseña son incorrectas"
+  </Tab>
+</Tabs>
+
+<Warning>
+Only users with `id_state = 1` (active status) can log in. Coordinators can suspend users through the user management interface.
+</Warning>
+
+## Password Recovery
+
+### Request Password Reset
+
+<Steps>
+  <Step title="Access Forgot Password Form">
+    Click "Forgot Password" on the login page.
+    
+    **Route:** `GET /forgot-password`
+
+    ```php AuthController.php:64-67
+    public function showForgotPasswordForm()
+    {
+        return view('auth.forgot-password');
+    }
+    ```
+  </Step>
+
+  <Step title="Enter Email Address">
+    Provide the email address associated with your account.
+
+    <ParamField path="email" type="string" required>
+      Email address registered in the system
+    </ParamField>
+  </Step>
+
+  <Step title="Receive Reset Link">
+    Submit the form to receive a password reset link via email.
+    
+    **Route:** `POST /forgot-password`
+
+    ```php AuthController.php:69-81
+    public function sendResetLink(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email'
+        ]);
+
+        $status = Password::sendResetLink(
+            $request->only('email')
+        );
+
+        return $status === Password::RESET_LINK_SENT
+            ? back()->with('status', 'Te hemos enviado un enlace de recuperación a tu correo')
+            : back()->withErrors(['email' => 'No se pudo enviar el enlace']);
+    }
+    ```
+  </Step>
+</Steps>
+
+### Reset Password
+
+<Steps>
+  <Step title="Click Reset Link">
+    Open the email and click the password reset link.
+    
+    **Route:** `GET /reset-password/{token}`
+
+    ```php AuthController.php
+    public function showResetPasswordForm($token)
+    {
+        return view('auth.reset-password', ['token' => $token]);
+    }
+    ```
+  </Step>
+
+  <Step title="Enter New Password">
+    Complete the password reset form:
+
+    <ParamField path="email" type="string" required>
+      Email address
+    </ParamField>
+
+    <ParamField path="password" type="string" required>
+      New password (minimum 8 characters)
+    </ParamField>
+
+    <ParamField path="password_confirmation" type="string" required>
+      Confirm new password
+    </ParamField>
+  </Step>
+
+  <Step title="Submit New Password">
+    **Route:** `POST /reset-password`
+
+    ```php AuthController.php
+    public function resetPassword(Request $request)
+    {
+        $request->validate([
+            'token' => 'required',
+            'email' => 'required|email',
+            'password' => 'required|min:8|confirmed',
+        ]);
+
+        $status = Password::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function ($user, $password) {
+                $user->forceFill([
+                    'password' => Hash::make($password)
+                ])->save();
+            }
+        );
+
+        return $status === Password::PASSWORD_RESET
+            ? redirect()->route('login')->with('status', 'Contraseña actualizada exitosamente')
+            : back()->withErrors(['email' => 'Error al restablecer la contraseña']);
+    }
+    ```
+  </Step>
+</Steps>
+
+## Logout
+
+Users can log out from any authenticated page:
+
+**Route:** `GET /logout`
+
+```php AuthController.php:19-25
+public function logout() {
+    Auth::logout();
+    Session::flush();
+    Session::regenerate(true);
+
+    return redirect()->route('login');
+}
+```
+
+The logout process:
+1. Destroys the authentication session
+2. Flushes all session data
+3. Regenerates the session ID (prevents session fixation)
+4. Redirects to login page
+
+## Session Security
+
+### Prevent Back History
+
+The system uses `PreventBackHistoryMiddleware` to prevent users from accessing authenticated pages after logout:
+
+```php web.php:60
+Route::middleware([PreventBackHistoryMiddleware::class])->group(function () {
+    // Protected routes
+});
+```
+
+This middleware adds cache control headers to prevent browser caching of authenticated pages.
+
+### Role-Based Access Control
+
+After authentication, access to routes is controlled by role-specific middleware:
+
+<CardGroup cols={3}>
+  <Card title="RoleMiddleware" icon="user-crown">
+    Coordinator-only routes
+  </Card>
+  <Card title="RoleDocenteMiddleware" icon="chalkboard-user">
+    Teacher-only routes
+  </Card>
+  <Card title="RolePsicoorientadorMiddleware" icon="user-doctor">
+    Psychologist-only routes
+  </Card>
+</CardGroup>
+
+### Session Configuration
+
+Session settings in `.env`:
+
+```bash .env.example
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+```
+
+- **Driver:** Sessions stored in the database for persistence
+- **Lifetime:** 120 minutes of inactivity before auto-logout
+
+## Common Profile Actions
+
+Authenticated users can manage their profile:
+
+### View Profile
+
+**Route:** `GET /mi-perfil`
+
+Displays user information and allows updates to:
+- Email address
+- Profile photo
+
+### Update Email
+
+**Route:** `PUT /mi-perfil/email`
+
+```php ProfileController.php
+public function updateEmail(Request $request)
+{
+    $request->validate([
+        'email' => 'required|email|unique:users_teachers,email,' . Auth::id()
+    ]);
+
+    $user = Auth::user();
+    $user->email = $request->email;
+    $user->save();
+
+    return redirect()->back()->with('success', 'Email actualizado.');
+}
+```
+
+### Update Profile Photo
+
+**Route:** `PUT /profile/photo`
+
+Upload a new profile photo (JPG, PNG, max 2MB).
+
+### Delete Profile Photo
+
+**Route:** `DELETE /profile/photo`
+
+Remove the current profile photo.
+
+## Security Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Strong Passwords" icon="shield-check">
+    Use passwords with at least 8 characters, including uppercase, lowercase, numbers, and symbols.
+  </Card>
+  <Card title="Regular Logouts" icon="right-from-bracket">
+    Always log out when using shared or public computers.
+  </Card>
+  <Card title="Email Security" icon="envelope-circle-check">
+    Ensure your registered email is secure and accessible for password recovery.
+  </Card>
+  <Card title="Suspicious Activity" icon="triangle-exclamation">
+    Report any suspicious login attempts or account issues to the coordinator immediately.
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Account Suspended">
+    If you see "Tu cuenta se encuentra suspendida," contact your institution's coordinator. They can reactivate your account through the user management interface.
+  </Accordion>
+
+  <Accordion title="Password Reset Email Not Received">
+    Check:
+    - Spam/junk folder
+    - Correct email address registered
+    - Mail server configuration (if you're an administrator)
+    
+    If the issue persists, contact the system administrator.
+  </Accordion>
+
+  <Accordion title="Session Expires Too Quickly">
+    The default session lifetime is 120 minutes. If you need longer sessions, contact the system administrator to adjust `SESSION_LIFETIME` in `.env`.
+  </Accordion>
+
+  <Accordion title="Can't Access Certain Pages">
+    Your role determines which pages you can access. If you need additional permissions, contact your coordinator to verify your role assignment.
+  </Accordion>
+</AccordionGroup>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    System configuration and environment setup
+  </Card>
+  <Card title="User Roles" icon="users-gear" href="/roles/coordinator">
+    Understand different user roles and permissions
+  </Card>
+  <Card title="User Management" icon="user-plus" href="/features/user-management">
+    How coordinators manage user accounts
+  </Card>
+  <Card title="Authentication Routes" icon="route" href="/api/routes/authentication">
+    Technical API reference for authentication endpoints
+  </Card>
+</CardGroup>

@@ -1,0 +1,484 @@
+---
+title: 'PsicoController'
+description: 'Controller for psychologist operations including student management, reports, and history tracking'
+---
+
+## Overview
+
+The `PsicoController` manages all psychologist-related operations including viewing assigned students, creating psychological reports, managing referral details, and maintaining student history records.
+
+**Namespace:** `App\Http\Controllers`
+
+**File:** `app/Http/Controllers/PsicoController.php`
+
+---
+
+## Private Methods
+
+### studentsByState()
+
+Internal helper method to filter students by state for the authenticated psychologist.
+
+```php
+private function studentsByState(Request $request, string $state, string $label, string $routeName)
+```
+
+**Parameters:**
+- `$request` - HTTP request with optional search query
+- `$state` - State name to filter by
+- `$label` - Display label for the view
+- `$routeName` - Route name for pagination
+
+**Logic:**
+- Filters students by psychologist's assigned degrees
+- Supports search by name, last name, document number, or full name
+- Checks if students have psychoorientation annexes
+- Returns paginated results (15 per page)
+
+---
+
+## Student Listing Methods
+
+### index_students_active_psico()
+
+Lists ALL students assigned to the psychologist, regardless of state.
+
+```php
+public function index_students_active_psico(Request $request)
+```
+
+<ParamField query="search" type="string">
+  Search term to filter students by name, last name, document number, or full name
+</ParamField>
+
+**Returns:** View `psycho.listStudentsByState`
+
+**Data Provided:**
+- Paginated students (15 per page)
+- Count of psychoorientation records with annexes
+- Degree and group relationships
+- State label: "Activos"
+
+**Ordering:** By name, then last name
+
+---
+
+### index_students_piar_psico()
+
+Lists students in "en PIAR" status.
+
+```php
+public function index_students_piar_psico(Request $request)
+```
+
+<ParamField query="search" type="string">
+  Search filter
+</ParamField>
+
+**Returns:** Students with state "en PIAR"
+
+---
+
+### index_students_dua_psico()
+
+Lists students in "en DUA" status.
+
+```php
+public function index_students_dua_psico(Request $request)
+```
+
+<ParamField query="search" type="string">
+  Search filter
+</ParamField>
+
+**Returns:** Students with state "en DUA"
+
+---
+
+### index_student_remitted_psico()
+
+Lists students with "activo" status (newly remitted, pending review).
+
+```php
+public function index_student_remitted_psico(Request $request)
+```
+
+<ParamField query="search" type="string">
+  Search by name, last name, or document number
+</ParamField>
+
+**Returns:** View `psycho.listRemitted` with paginated students
+
+**Access Control:** Only students from degrees assigned to the psychologist
+
+---
+
+## Referral Details
+
+### detailsReferral()
+
+Displays detailed information about a student's referral.
+
+```php
+public function detailsReferral($id)
+```
+
+<ParamField path="id" type="integer" required>
+  Student ID
+</ParamField>
+
+**Returns:** View `psycho.showDetailsReferral`
+
+**Data Provided:**
+- Student information
+- Latest referral details
+- Latest psychological report (if exists)
+- All degrees and groups (for editing)
+
+---
+
+### update_details_referral()
+
+Updates both student information and referral details.
+
+```php
+public function update_details_referral(Request $request, string $id)
+```
+
+<ParamField path="id" type="string" required>
+  Student ID
+</ParamField>
+
+<ParamField body="number_documment" type="string" required>
+  Document number (1-20 digits, unique)
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  Student's first name
+</ParamField>
+
+<ParamField body="last_name" type="string" required>
+  Student's last name
+</ParamField>
+
+<ParamField body="degree" type="integer" required>
+  Degree ID (must exist in degrees table)
+</ParamField>
+
+<ParamField body="group" type="integer" required>
+  Group ID (must exist in groups table)
+</ParamField>
+
+<ParamField body="age" type="integer" required>
+  Student's age (minimum: 0)
+</ParamField>
+
+<ParamField body="reason_referral" type="string" required>
+  Reason for referral
+</ParamField>
+
+<ParamField body="observation" type="string" required>
+  Observations
+</ParamField>
+
+<ParamField body="strategies" type="string" required>
+  Applied strategies
+</ParamField>
+
+**Business Logic:**
+- Updates student record
+- Updates latest referral record
+- Automatically updates course field based on degree
+
+**Returns:** Redirects back with success message
+
+---
+
+## Psychological Reports
+
+### report_student()
+
+Displays form for creating a psychological report.
+
+```php
+public function report_student(string $id)
+```
+
+<ParamField path="id" type="string" required>
+  Student ID
+</ParamField>
+
+**Returns:** View `psycho.addReportStudent`
+
+**Data Provided:**
+- Available groups and degrees
+- States ("Activo" and "en PIAR")
+- Student information
+
+---
+
+### store_report_student()
+
+Stores a new psychological report and updates student status.
+
+```php
+public function store_report_student(Request $request, string $id)
+```
+
+<ParamField path="id" type="string" required>
+  Student ID
+</ParamField>
+
+<ParamField body="number_documment" type="string" required>
+  Document number (1-20 digits, unique)
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  Student's first name
+</ParamField>
+
+<ParamField body="last_name" type="string" required>
+  Student's last name
+</ParamField>
+
+<ParamField body="degree" type="integer" required>
+  Degree ID
+</ParamField>
+
+<ParamField body="group" type="integer" required>
+  Group ID
+</ParamField>
+
+<ParamField body="age" type="integer" required>
+  Student's age
+</ParamField>
+
+<ParamField body="state" type="integer" required>
+  State ID (must exist in states table)
+</ParamField>
+
+<ParamField body="title_report" type="string" required>
+  Report title
+</ParamField>
+
+<ParamField body="reason_inquiry" type="string" required>
+  Reason for inquiry/investigation
+</ParamField>
+
+<ParamField body="recomendations" type="string" required>
+  Recommendations
+</ParamField>
+
+<ParamField body="annex_one" type="file">
+  PDF file (max 5MB)
+</ParamField>
+
+**File Storage:**
+- PDF files stored in `public/annexes/student_{id}/`
+- Filename format: `student_{id}_{YmdHis}.pdf`
+
+**Business Logic:**
+
+1. Updates student record (personal info and state)
+2. Retrieves group director information
+3. Uploads PDF annex if provided
+4. Creates psychoorientation record with:
+   - Psychologist ID (authenticated user)
+   - Student information snapshot
+   - Group director name
+   - Report details
+   - Annex file path
+
+**Returns:** Redirects to remitted students list with success message
+
+<Note>
+  Uses database transactions to ensure data consistency. If any step fails, all changes are rolled back.
+</Note>
+
+---
+
+## Student History
+
+### show_student_history()
+
+Displays complete history of a student's referrals and reports.
+
+```php
+public function show_student_history(string $id)
+```
+
+<ParamField path="id" type="string" required>
+  Student ID
+</ParamField>
+
+**Returns:** View `psycho.studentHistory`
+
+**Data Provided:**
+- Student information
+- Paginated referrals (10 per page, newest first)
+- Paginated psychological reports (10 per page, newest first)
+
+---
+
+### history_details_referral()
+
+Displays detailed view of a specific referral from history.
+
+```php
+public function history_details_referral($id)
+```
+
+<ParamField path="id" type="integer" required>
+  Referral ID
+</ParamField>
+
+**Returns:** View `psycho.detailsHistory.referral`
+
+**Data Provided:**
+- Referral record with student relationship
+- Associated student
+- Latest psychological report
+
+---
+
+### update_history_details_referral()
+
+Updates a historical referral record.
+
+```php
+public function update_history_details_referral(Request $request, string $id)
+```
+
+<ParamField path="id" type="string" required>
+  Referral ID
+</ParamField>
+
+<ParamField body="reason" type="string" required>
+  Referral reason
+</ParamField>
+
+<ParamField body="observation" type="string" required>
+  Observations
+</ParamField>
+
+<ParamField body="strategies" type="string" required>
+  Applied strategies
+</ParamField>
+
+**Returns:** Redirects back with success message
+
+---
+
+### current_report_student()
+
+Displays the most recent psychological report for a student.
+
+```php
+public function current_report_student($id)
+```
+
+<ParamField path="id" type="integer" required>
+  Student ID
+</ParamField>
+
+**Returns:** View `psycho.detailsReportStudent`
+
+**Data Provided:**
+- Student information
+- Latest psychological report
+
+---
+
+### history_details_report()
+
+Displays detailed view of a specific report from history.
+
+```php
+public function history_details_report(string $id)
+```
+
+<ParamField path="id" type="string" required>
+  Psychoorientation report ID
+</ParamField>
+
+**Returns:** View `psycho.detailsHistory.report`
+
+---
+
+### update_history_details_report()
+
+Updates a historical psychological report, including optional file replacement.
+
+```php
+public function update_history_details_report(Request $request, string $id)
+```
+
+<ParamField path="id" type="string" required>
+  Psychoorientation report ID
+</ParamField>
+
+<ParamField body="title_report" type="string" required>
+  Report title
+</ParamField>
+
+<ParamField body="reason_inquiry" type="string" required>
+  Reason for inquiry
+</ParamField>
+
+<ParamField body="recomendations" type="string" required>
+  Recommendations
+</ParamField>
+
+<ParamField body="annex_one" type="file">
+  PDF file (max 5MB) - replaces existing file if provided
+</ParamField>
+
+**File Management:**
+- If new file uploaded, deletes old file from storage
+- Stores new file with timestamp-based filename
+
+**Returns:** Redirects back with success message
+
+---
+
+### delete_annex()
+
+Deletes the PDF annex from a psychological report.
+
+```php
+public function delete_annex($id)
+```
+
+<ParamField path="id" type="integer" required>
+  Psychoorientation report ID
+</ParamField>
+
+**Business Logic:**
+- Deletes file from storage if it exists
+- Sets `annex_one` field to null in database
+
+**Returns:** Redirects back with success message
+
+---
+
+## Database Tables Referenced
+
+- `users_students` - Student records
+- `referrals` - Referral information
+- `psychoorientations` - Psychological reports
+- `degrees` - Academic degrees
+- `groups` - Student groups
+- `states` - Student states
+- `users_load_degrees` - Psychologist-degree assignments
+- `users_teachers` - Teacher records
+
+## File Storage
+
+PDF annexes are stored using Laravel's `public` disk in the following structure:
+```
+storage/app/public/annexes/student_{id}/student_{id}_{timestamp}.pdf
+```
+
+## Authentication
+
+All methods require psychologist authentication. Uses `Auth::id()` to identify the current psychologist.

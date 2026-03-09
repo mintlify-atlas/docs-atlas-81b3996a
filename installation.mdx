@@ -1,0 +1,375 @@
+---
+title: Installation
+description: Step-by-step guide to install the Bethlemitas Student Support System on your server
+---
+
+## System Requirements
+
+Before installing the Bethlemitas Student Support System, ensure your server meets these requirements:
+
+<CardGroup cols={2}>
+  <Card title="PHP" icon="php">
+    Version 8.2 or higher
+  </Card>
+  <Card title="Composer" icon="box">
+    Latest stable version
+  </Card>
+  <Card title="Database" icon="database">
+    MySQL 5.7+ or MariaDB 10.3+
+  </Card>
+  <Card title="Web Server" icon="server">
+    Apache or Nginx
+  </Card>
+</CardGroup>
+
+### PHP Extensions Required
+
+Ensure the following PHP extensions are enabled:
+
+- `bcmath`
+- `ctype`
+- `fileinfo`
+- `json`
+- `mbstring`
+- `openssl`
+- `pdo`
+- `pdo_mysql`
+- `tokenizer`
+- `xml`
+
+## Installation Steps
+
+<Steps>
+  <Step title="Clone the Repository">
+    Clone the project repository to your server:
+    
+    ```bash
+    git clone <repository-url> bethlemitas-system
+    cd bethlemitas-system
+    ```
+  </Step>
+
+  <Step title="Install Dependencies">
+    Use Composer to install all PHP dependencies defined in `composer.json`:
+    
+    ```bash
+    composer install
+    ```
+    
+    This will install:
+    - **Laravel Framework 11.9** - Core application framework
+    - **Spatie Laravel Permission 6.3** - Role and permission management
+    - **Laravel Tinker 2.9** - Interactive REPL for debugging
+    
+    <Note>
+      The system requires PHP 8.2 as specified in `composer.json`. Ensure your environment meets this requirement before running `composer install`.
+    </Note>
+  </Step>
+
+  <Step title="Configure Environment File">
+    Copy the example environment file and generate an application key:
+    
+    ```bash
+    cp .env.example .env
+    php artisan key:generate
+    ```
+    
+    The application key will be automatically added to your `.env` file. This key is used for encrypting sessions and other secure data.
+  </Step>
+
+  <Step title="Set Up Database">
+    Create a MySQL database for the application:
+    
+    ```sql
+    CREATE DATABASE piarmanager CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    ```
+    
+    <Warning>
+      The default database name in `.env.example` is `piarmanager`. You can use this name or change it to match your preference.
+    </Warning>
+  </Step>
+
+  <Step title="Configure Database Connection">
+    Edit your `.env` file and update the database credentials:
+    
+    ```bash
+    DB_CONNECTION=mysql
+    DB_HOST=127.0.0.1
+    DB_PORT=3306
+    DB_DATABASE=piarmanager
+    DB_USERNAME=your_database_user
+    DB_PASSWORD=your_database_password
+    ```
+    
+    See `~/workspace/source/.env.example` lines 23-28 for the default configuration.
+  </Step>
+
+  <Step title="Run Database Migrations">
+    Execute the database migrations to create all required tables:
+    
+    ```bash
+    php artisan migrate
+    ```
+    
+    This will create 28 migration files including:
+    
+    - **User tables**: `users_teachers`, `users_students`
+    - **Academic structure**: `degrees`, `groups`, `areas`, `periods`
+    - **Support system**: `referrals`, `psychoorientations`, `acta_piars`, `dua`
+    - **Permission system**: `roles`, `permissions`, `model_has_roles`, etc.
+    - **Infrastructure**: `cache`, `jobs`, `sessions`, `password_reset_tokens`
+    
+    <Accordion title="View Complete Migration List">
+      ```
+      0001_01_01_000001_create_cache_table
+      0001_01_01_000002_create_jobs_table
+      2024_10_01_155113_create_degrees_table
+      2024_10_01_155159_create_states_table
+      2024_10_01_155216_create_periods_table
+      2024_10_01_155313_create_areas_table
+      2024_10_01_155315_create_groups_table
+      2024_10_01_170648_create_institution
+      2024_10_02_130129_create_users_teachers_table
+      2024_10_02_130130_create_users_students_table
+      2024_10_02_130144_create_referrals_table
+      2024_10_02_130145_create_psychoorientations_table
+      2024_10_02_130205_create_users_load_groups_table
+      2024_10_02_130217_create_users_load_areas_table
+      2024_10_02_154113_create_subjects_receiveds_table
+      2024_10_03_133006_create_permission_tables
+      2024_10_16_154301_create_users_load_degrees_table
+      2024_10_28_114731_create_teachers_areas_groups_table
+      2025_08_23_140000_create_student_characteristics_table
+      2025_08_23_140001_create_acta_piars_table
+      2025_08_23_140002_create_agreements_table
+      2025_08_26_151823_create_recommendation
+      2025_08_26_171549_create_strategies
+      2025_08_26_171603_create_dua
+      2025_08_26_171623_create_annual_report
+      2026_02_23_155444_drop_ethnic_groups_table
+      2026_03_03_121259_add_annex_one_to_psychoorientations_table
+      ```
+      
+      All migrations are located in `~/workspace/source/database/migrations/`
+    </Accordion>
+  </Step>
+
+  <Step title="Seed Initial Data">
+    Populate the database with essential system data:
+    
+    ```bash
+    php artisan db:seed
+    ```
+    
+    This will execute seeders that create:
+    
+    - **Roles**: coordinador, docente, psicoorientador, estudiante
+    - **States**: activo, en PIAR, en DUA
+    - **Initial degrees, groups, areas, and periods**
+    - **Default permissions** for each role
+    
+    Reference: `~/workspace/source/database/seeders/RolSeeder.php` and `StateSeeder.php`
+    
+    <Note>
+      The seeding process creates the role structure defined in `database/seeders/RolSeeder.php`, which establishes four user roles with the `create_user` permission assigned to coordinador, docente, and psicoorientador roles.
+    </Note>
+  </Step>
+
+  <Step title="Configure Storage Permissions">
+    Create the symbolic link for public storage and set proper permissions:
+    
+    ```bash
+    php artisan storage:link
+    chmod -R 775 storage
+    chmod -R 775 bootstrap/cache
+    ```
+    
+    These permissions allow the web server to write uploaded files (such as teacher signatures and student documents) and cache data.
+  </Step>
+
+  <Step title="Install Frontend Dependencies (Optional)">
+    If you plan to modify frontend assets, install Node.js dependencies:
+    
+    ```bash
+    npm install
+    npm run build
+    ```
+    
+    See `~/workspace/source/package.json` for frontend build configuration.
+  </Step>
+
+  <Step title="Configure Web Server">
+    Point your web server document root to the `public` directory.
+    
+    **For Apache**, create a virtual host:
+    
+    ```apache
+    <VirtualHost *:80>
+        ServerName your-domain.com
+        DocumentRoot /path/to/bethlemitas-system/public
+        
+        <Directory /path/to/bethlemitas-system/public>
+            AllowOverride All
+            Require all granted
+        </Directory>
+    </VirtualHost>
+    ```
+    
+    **For Nginx**, configure the server block:
+    
+    ```nginx
+    server {
+        listen 80;
+        server_name your-domain.com;
+        root /path/to/bethlemitas-system/public;
+        
+        add_header X-Frame-Options "SAMEORIGIN";
+        add_header X-Content-Type-Options "nosniff";
+        
+        index index.php;
+        
+        location / {
+            try_files $uri $uri/ /index.php?$query_string;
+        }
+        
+        location ~ \.php$ {
+            fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
+            fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+            include fastcgi_params;
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Test Installation">
+    Start the Laravel development server to verify the installation:
+    
+    ```bash
+    php artisan serve
+    ```
+    
+    Visit `http://localhost:8000` in your browser. You should see the login page.
+    
+    <Warning>
+      The development server should only be used for testing. For production deployments, configure a proper web server (Apache/Nginx) as described in the previous step.
+    </Warning>
+  </Step>
+</Steps>
+
+## Post-Installation Verification
+
+### Check Database Tables
+
+Verify that all tables were created successfully:
+
+```bash
+php artisan migrate:status
+```
+
+You should see all migrations marked as "Ran".
+
+### Verify Permissions System
+
+Check that the Spatie Permission package is working correctly:
+
+```bash
+php artisan tinker
+```
+
+Then run:
+
+```php
+\Spatie\Permission\Models\Role::all()->pluck('name');
+// Should return: ["coordinador", "docente", "psicoorientador", "estudiante"]
+
+\Spatie\Permission\Models\Permission::all()->pluck('name');
+// Should return: ["create_user"]
+```
+
+See `~/workspace/source/config/permission.php` for permission configuration.
+
+### Test Application Health
+
+Run the health check command:
+
+```bash
+php artisan about
+```
+
+This displays environment information, cache status, and driver configuration.
+
+## Development Tools
+
+### Laravel Tinker
+
+The system includes Laravel Tinker for interactive debugging:
+
+```bash
+php artisan tinker
+```
+
+Use this to test models, relationships, and queries without writing test scripts.
+
+### Database Seeding for Development
+
+For development and testing environments, you can run specific seeders:
+
+```bash
+php artisan db:seed --class=AreasSeeder
+php artisan db:seed --class=DegreeSeeder
+php artisan db:seed --class=GroupSeeder
+php artisan db:seed --class=PeriodSeeder
+```
+
+Seeders are located in `~/workspace/source/database/seeders/`.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Migration Errors">
+    If migrations fail:
+    
+    1. Verify database credentials in `.env`
+    2. Ensure the database exists and is accessible
+    3. Check that the database user has CREATE and ALTER permissions
+    4. Reset migrations if needed: `php artisan migrate:fresh` (⚠️ destroys all data)
+  </Accordion>
+  
+  <Accordion title="Permission Denied Errors">
+    If you encounter permission errors:
+    
+    ```bash
+    sudo chown -R www-data:www-data storage bootstrap/cache
+    sudo chmod -R 775 storage bootstrap/cache
+    ```
+    
+    Replace `www-data` with your web server user (might be `apache` or `nginx`).
+  </Accordion>
+  
+  <Accordion title="Composer Installation Failures">
+    If Composer fails to install dependencies:
+    
+    - Verify PHP version: `php -v` (must be 8.2+)
+    - Update Composer: `composer self-update`
+    - Clear Composer cache: `composer clear-cache`
+    - Try installing with: `composer install --no-scripts`
+  </Accordion>
+  
+  <Accordion title="Application Key Missing">
+    If you see "No application encryption key has been specified":
+    
+    ```bash
+    php artisan key:generate
+    ```
+    
+    This updates the `APP_KEY` in your `.env` file (see line 3 in `.env.example`).
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+Once installation is complete, proceed to the configuration guide to set up your institution's specific settings.
+
+<Card title="Configuration Guide" icon="gear" href="/configuration">
+  Configure institutional settings, user accounts, and academic structure
+</Card>

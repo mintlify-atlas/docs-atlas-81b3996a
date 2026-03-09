@@ -1,0 +1,234 @@
+---
+title: 'CreateReferralController'
+description: 'Controller for managing student referrals and teacher-submitted cases'
+---
+
+## Overview
+
+The `CreateReferralController` handles the creation, listing, and management of student referrals. Teachers use this controller to submit students for psychological support, track referral status, and manage student records.
+
+**Namespace:** `App\Http\Controllers`
+
+**File:** `app/Http/Controllers/CreateReferralController.php`
+
+---
+
+## Methods
+
+### create_referral()
+
+Displays the student referral form with available groups and degrees.
+
+```php
+public function create_referral()
+```
+
+**Returns:** View `teacher.studentReferral`
+
+**Data Provided:**
+- `groups` - Groups ordered by numeric value
+- `degrees` - Degrees ordered by numeric value
+
+**Route:** Displays form for creating new student referrals
+
+---
+
+### store_referral()
+
+Stores a new student referral. Creates a student record if they don't exist, or updates existing discarded students. Sends email notification to assigned psychologist.
+
+```php
+public function store_referral(Request $request)
+```
+
+<ParamField body="number_documment" type="string" required>
+  Student's document number (1-20 digits)
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  Student's first name
+</ParamField>
+
+<ParamField body="last_name" type="string" required>
+  Student's last name
+</ParamField>
+
+<ParamField body="degree" type="integer" required>
+  Degree ID (must exist in degrees table)
+</ParamField>
+
+<ParamField body="group" type="integer" required>
+  Group ID (must exist in groups table)
+</ParamField>
+
+<ParamField body="age" type="integer">
+  Student's age (minimum: 0)
+</ParamField>
+
+<ParamField body="reason_referral" type="string" required>
+  Reason for the referral
+</ParamField>
+
+<ParamField body="observation" type="string" required>
+  Observations about the student
+</ParamField>
+
+<ParamField body="strategies" type="string" required>
+  Strategies applied before referral
+</ParamField>
+
+**Business Logic:**
+
+1. Validates that a psychologist is assigned to the selected degree
+2. Checks if student already exists:
+   - If student is "activo" - returns info message (already in review)
+   - If student is "en PIAR" - returns info message (already in PIAR process)
+   - If student is "en DUA" - returns info message (already in DUA process)
+3. Creates new student record with role "estudiante"
+4. Creates referral record linked to student
+5. Sends email notification to assigned psychologist
+
+**Returns:**
+- Success: Redirects back with success message
+- Error (no psychologist): Returns with error message
+- Info (student exists): Returns with info message about current status
+
+<Note>
+  This method uses database transactions to ensure both student and referral records are created atomically.
+</Note>
+
+---
+
+### index_student_remitted()
+
+Lists all students referred by the authenticated teacher with "activo" status.
+
+```php
+public function index_student_remitted(Request $request)
+```
+
+<ParamField query="search" type="string">
+  Search term to filter by name, last name, document number, or full name
+</ParamField>
+
+**Returns:** View `teacher.studentListRemitted` with paginated students (15 per page)
+
+**Data Relationships:**
+- Latest referral information
+- Student group
+- Student degree
+
+**Ordering:** Alphabetically by name, then last name
+
+---
+
+### edit_student()
+
+Displays the edit form for a referred student.
+
+```php
+public function edit_student(string $id)
+```
+
+<ParamField path="id" type="string" required>
+  Student ID
+</ParamField>
+
+**Returns:** View `teacher.studentEdit`
+
+**Data Provided:**
+- `student` - Student record
+- `groups` - All available groups
+- `degrees` - All available degrees
+
+---
+
+### update_student()
+
+Updates student information. Only updates if changes are detected.
+
+```php
+public function update_student(Request $request, string $id)
+```
+
+<ParamField path="id" type="string" required>
+  Student ID
+</ParamField>
+
+<ParamField body="number_documment" type="string" required>
+  Student's document number (1-20 digits, must be unique)
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  Student's first name
+</ParamField>
+
+<ParamField body="last_name" type="string" required>
+  Student's last name
+</ParamField>
+
+<ParamField body="degree" type="integer" required>
+  Degree ID
+</ParamField>
+
+<ParamField body="group" type="integer" required>
+  Group ID
+</ParamField>
+
+<ParamField body="age" type="integer">
+  Student's age (minimum: 0)
+</ParamField>
+
+**Business Logic:**
+
+1. Compares current data with new data
+2. Validates that a psychologist is assigned to the new degree
+3. Only updates if changes are detected
+
+**Returns:**
+- Success: Redirects with success message if changes were made
+- Info: Redirects with info message if no changes detected
+- Error: Returns error if no psychologist assigned to degree
+
+---
+
+### addMinutes()
+
+Lists students in PIAR or DUA status from groups taught by the authenticated teacher. Allows teachers to select students for adding meeting minutes.
+
+```php
+public function addMinutes(Request $request)
+```
+
+<ParamField query="search" type="string">
+  Search term to filter students
+</ParamField>
+
+**Access Control:** Only shows students from groups where the teacher has load assignments
+
+**Returns:** View `teacher.addMinutes` with paginated students (15 per page)
+
+**Student Status Filter:** Only students with state "en PIAR" or "en DUA"
+
+**Ordering:** Alphabetically by name, then last name
+
+---
+
+## Database Tables Referenced
+
+- `users_students` - Student records
+- `referrals` - Referral information
+- `degrees` - Academic degrees/grades
+- `groups` - Student groups/classes
+- `states` - Student status (activo, en PIAR, en DUA, etc.)
+- `users_load_degree` - Psychologist-degree assignments
+- `users_load_group` - Teacher-group assignments
+- `users_teachers` - Teacher records
+
+## Email Notifications
+
+When a referral is created, a queued email (`CreatedReferralMail`) is sent to the assigned psychologist for the student's degree.
+
+## Authentication
+
+All methods require authentication. The controller uses `Auth::id()` to identify the current teacher.

@@ -1,0 +1,557 @@
+---
+title: PIAR and DUA Management
+description: Manage Individualized Plans of Reasonable Adjustments (PIAR) and Universal Design for Learning (DUA) accommodations for students requiring specialized support.
+---
+
+## Overview
+
+The PIAR and DUA Management module provides specialized educational support for students with diverse learning needs. PIAR (Plan Individual de Ajustes Razonables) creates individualized adjustment plans, while DUA (Diseño Universal para el Aprendizaje) implements universal learning design principles.
+
+## Understanding PIAR and DUA
+
+<CardGroup cols={2}>
+  <Card title="PIAR" icon="file-pen">
+    **Plan Individual de Ajustes Razonables**
+    
+    Individualized plans documenting specific reasonable adjustments for students with special educational needs. Includes objectives, barriers, adjustments, and evaluation methods.
+  </Card>
+  
+  <Card title="DUA" icon="universal-access">
+    **Diseño Universal para el Aprendizaje**
+    
+    Universal Design for Learning activities that provide flexible learning approaches. Includes activity descriptions, goals, resources, and expected results.
+  </Card>
+</CardGroup>
+
+## PIAR (Acta PIAR) Model
+
+The `Acta_piar` model (`app/Models/Acta_piar.php:9`) manages individualized adjustment plans:
+
+```php
+protected $fillable = [
+    'id_user_student',
+    'id_user_teacher',
+    'id_area',
+    'id_institution',
+    'id_period',
+    'overview',
+    'student_personal_description',
+    'areas_learning',
+    'objetives_purposes',
+    'barries',
+    'reasonable_adjustments',
+    'adjustment_evaluation',
+    'production_date',
+];
+```
+
+### PIAR Components
+
+<AccordionGroup>
+  <Accordion title="overview">
+    General overview of the student's current situation and needs.
+  </Accordion>
+  
+  <Accordion title="student_personal_description">
+    Detailed personal description of the student, including strengths, challenges, interests, and background.
+  </Accordion>
+  
+  <Accordion title="areas_learning">
+    Specific subject areas where the student requires support or adjustments.
+  </Accordion>
+  
+  <Accordion title="objetives_purposes">
+    Educational objectives and purposes for this individualized plan.
+  </Accordion>
+  
+  <Accordion title="barries">
+    Identified barriers to learning (physical, cognitive, social, emotional, or environmental).
+  </Accordion>
+  
+  <Accordion title="reasonable_adjustments">
+    Specific reasonable adjustments to be implemented (curriculum modifications, teaching strategies, evaluation methods, resources).
+  </Accordion>
+  
+  <Accordion title="adjustment_evaluation">
+    Methods and criteria for evaluating the effectiveness of the adjustments.
+  </Accordion>
+  
+  <Accordion title="production_date">
+    Date when the PIAR document was created or last updated.
+  </Accordion>
+</AccordionGroup>
+
+### PIAR Relationships
+
+```php
+// Relationship with student
+public function user_student()
+{
+    return $this->belongsTo(Users_student::class, 'id_user_student');
+}
+
+// Relationship with teacher who created it
+public function user_teacher()
+{
+    return $this->belongsTo(Users_teacher::class, 'id_user_teacher');
+}
+
+// Relationship with subject area
+public function area()
+{
+    return $this->belongsTo(Area::class, 'id_area');
+}
+
+// Relationship with academic period
+public function period()
+{ 
+    return $this->belongsTo(Period::class, 'id_period');
+}
+
+// Relationship with institution
+public function institution()
+{
+    return $this->belongsTo(Institution::class, 'id_institution');
+}
+
+// A PIAR can have many recommendations
+public function recommendations()
+{
+    return $this->hasMany(Recommendation::class, 'id_acta_PIAR');
+}
+```
+
+## DUA Model
+
+The `Dua` model (`app/Models/Dua.php:8`) manages universal design learning activities:
+
+```php
+protected $fillable = [
+    'activity_description',
+    'observation',
+    'goal',
+    'resource',
+    'expected_results'
+];
+```
+
+### DUA Components
+
+<AccordionGroup>
+  <Accordion title="activity_description">
+    Detailed description of the learning activity designed with universal accessibility in mind.
+  </Accordion>
+  
+  <Accordion title="observation">
+    Observations about implementation, student responses, or modifications made during execution.
+  </Accordion>
+  
+  <Accordion title="goal">
+    The learning goal or objective this activity is designed to achieve.
+  </Accordion>
+  
+  <Accordion title="resource">
+    Resources, materials, or tools needed to implement the activity.
+  </Accordion>
+  
+  <Accordion title="expected_results">
+    Expected outcomes and results from implementing this DUA activity.
+  </Accordion>
+</AccordionGroup>
+
+### DUA Relationships
+
+```php
+// Relationship with student
+public function user_student()
+{
+    return $this->belongsTo(Users_student::class, 'id_user_student');
+}
+
+// Relationship with teacher
+public function user_teacher()
+{
+    return $this->belongsTo(Users_teacher::class, 'id_user_teacher');
+}
+
+// Relationship with subject area
+public function area()
+{
+    return $this->belongsTo(Area::class, 'id_area');
+}
+
+// Relationship with academic period
+public function period()
+{
+    return $this->belongsTo(Period::class, 'id_period');
+}
+```
+
+## Student State Progression
+
+Students move through different states in the support system:
+
+<Steps>
+  <Step title="Activo (Active)">
+    Student has been referred and is under initial evaluation by the psychologist.
+  </Step>
+  
+  <Step title="en PIAR">
+    After psychological evaluation, student is determined to need individualized adjustments. Teachers can now create PIAR documents.
+  </Step>
+  
+  <Step title="en DUA">
+    Student requires universal design learning approaches. Teachers can create DUA activities.
+  </Step>
+</Steps>
+
+## Teacher Access to PIAR/DUA Students
+
+Teachers can view students in PIAR or DUA status for their assigned groups (`app/Http/Controllers/CreateReferralController.php:222`):
+
+```php
+public function addMinutes(Request $request)
+{
+    $id_teacher = Auth::id();
+    
+    // Get groups this teacher is assigned to
+    $id_load_groups = Users_load_group::where('id_user_teacher', $id_teacher)
+        ->pluck('id_group');
+    
+    // Get students in PIAR or DUA status from those groups
+    $query = Users_student::whereHas('states', function ($q) {
+        $q->whereIn('state', ['en PIAR', 'en DUA']);
+    })->whereIn('id_group', $id_load_groups);
+    
+    // Apply search filter
+    if ($request->filled('search')) {
+        $searchTerm = $request->input('search');
+        $query->where(function ($q) use ($searchTerm) {
+            $q->where('name', 'LIKE', '%' . $searchTerm . '%')
+                ->orWhere('last_name', 'LIKE', '%' . $searchTerm . '%')
+                ->orWhere('number_documment', 'LIKE', '%' . $searchTerm . '%')
+                ->orWhereRaw("CONCAT(name, ' ', last_name) LIKE ?", ['%' . $searchTerm . '%']);
+        });
+    }
+    
+    $students = $query->orderBy('name', 'asc')
+        ->orderBy('last_name', 'asc')
+        ->paginate(15);
+    
+    return view('teacher.addMinutes', compact('students'));
+}
+```
+
+<Note>
+  Teachers can only create PIAR/DUA documents for students in groups they teach. This ensures teachers work with students they know.
+</Note>
+
+## Psychologist State Management
+
+Psychologists update student states when creating evaluation reports (`app/Http/Controllers/PsicoController.php:230`):
+
+### Setting Student to PIAR
+
+```php
+public function store_report_student(Request $request, string $id)
+{
+    $request->validate([
+        'state' => 'required|exists:states,id',
+        // ... other validations
+    ]);
+    
+    DB::beginTransaction();
+    
+    try {
+        // Update student state
+        $student = Users_student::findOrFail($id);
+        $student->update([
+            'id_state' => $request->state,  // Can be 'en PIAR' or 'Activo'
+            // ... other fields
+        ]);
+        
+        // Create psychological report with recommendations
+        Psychoorientation::create([
+            'psychologist_writes' => Auth::id(),
+            'id_user_student' => $id,
+            'recomendations' => $request->recomendations,
+            // ... other fields
+        ]);
+        
+        DB::commit();
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->with('error', $e->getMessage());
+    }
+}
+```
+
+### Available States
+
+When creating a report, psychologists can select from specific states:
+
+```php
+$states = State::whereIn('state', ['Activo', 'en PIAR'])->get();
+```
+
+## Viewing PIAR/DUA Students
+
+### Psychologist View
+
+Psychologists can filter students by state:
+
+```php
+// View students in PIAR
+public function index_students_piar_psico(Request $request)
+{
+    return $this->studentsByState($request, 'en PIAR', 'En PIAR', 'psico.students.piar');
+}
+
+// View students in DUA
+public function index_students_dua_psico(Request $request)
+{
+    return $this->studentsByState($request, 'en DUA', 'En DUA', 'psico.students.dua');
+}
+
+// Shared filter method
+private function studentsByState(Request $request, string $state, string $label, string $routeName)
+{
+    $id_psico = Auth::id();
+    
+    $load_degree = Users_load_degree::where('id_user', $id_psico)
+        ->pluck('id_degree')
+        ->toArray();
+    
+    $query = Users_student::whereHas('states', function ($q) use ($state) {
+            $q->where('state', $state);
+        })
+        ->whereIn('id_degree', $load_degree);
+    
+    // Check if students have psychological report attachments
+    $students = $query
+        ->withExists(['psychoorientations as has_annex' => function ($q) {
+            $q->whereNotNull('annex_one');
+        }])
+        ->orderBy('name')
+        ->orderBy('last_name')
+        ->paginate(15);
+    
+    return view('psycho.listStudentsByState', [
+        'students'   => $students,
+        'stateLabel' => $label,
+        'route'      => route($routeName),
+    ]);
+}
+```
+
+### Teacher View
+
+Teachers access the "Add Minutes" view to see PIAR/DUA students:
+
+```php
+// Route: routes/web.php:127
+Route::get('/addMinutes', [CreateReferralController::class, 'addMinutes'])
+    ->name('addMinutes');
+```
+
+## Creating PIAR Documents
+
+<Steps>
+  <Step title="Access Student List">
+    Teachers navigate to `/addMinutes` to view students in PIAR or DUA status from their groups.
+  </Step>
+  
+  <Step title="Select Student">
+    Choose a student to create a PIAR document for.
+  </Step>
+  
+  <Step title="Complete PIAR Form">
+    Fill out all required sections:
+    - Overview of student situation
+    - Personal description
+    - Learning areas requiring support
+    - Objectives and purposes
+    - Identified barriers
+    - Reasonable adjustments to implement
+    - Evaluation methods
+    - Production date
+  </Step>
+  
+  <Step title="Specify Context">
+    Select:
+    - Subject area (from teacher's assigned areas)
+    - Academic period
+    - Institution
+  </Step>
+  
+  <Step title="Add Recommendations">
+    Add specific recommendations for implementing the adjustments.
+  </Step>
+  
+  <Step title="Submit PIAR">
+    Save the document, which creates a permanent record linked to the student, teacher, and period.
+  </Step>
+</Steps>
+
+## Creating DUA Activities
+
+<Steps>
+  <Step title="Access DUA Student">
+    From the "Add Minutes" view, select a student in DUA status.
+  </Step>
+  
+  <Step title="Design Activity">
+    Create a universally accessible learning activity:
+    - Describe the activity in detail
+    - Define the learning goal
+    - List required resources
+    - Specify expected results
+  </Step>
+  
+  <Step title="Implementation Context">
+    Select:
+    - Subject area
+    - Academic period
+  </Step>
+  
+  <Step title="Add Observations">
+    Document any observations about the activity design or anticipated challenges.
+  </Step>
+  
+  <Step title="Submit DUA Activity">
+    Save the activity for implementation.
+  </Step>
+</Steps>
+
+## PIAR Recommendations System
+
+PIAR documents can have multiple associated recommendations through the `Recommendation` model:
+
+```php
+// In Acta_piar model
+public function recommendations()
+{
+    return $this->hasMany(Recommendation::class, 'id_acta_PIAR');
+}
+```
+
+This allows for:
+- Multiple recommendations per PIAR
+- Tracking implementation of specific recommendations
+- Progress monitoring over time
+
+## Document History and Tracking
+
+Both PIAR and DUA documents are:
+- **Timestamped**: Automatic `created_at` and `updated_at` timestamps
+- **Linked to periods**: Can track progress across academic periods
+- **Teacher-attributed**: Always know who created each document
+- **Student-specific**: Complete history per student
+
+### Accessing Historical Documents
+
+Through the student history view (`/student/history/{id}`), users can access:
+- All PIAR documents created for a student
+- All DUA activities designed for a student
+- Chronological progression of support
+- Evolution of adjustments over time
+
+## Multi-Period Support
+
+The system supports tracking across academic periods:
+
+```php
+// PIAR for different periods
+$piar_period_1 = Acta_piar::where('id_user_student', $student_id)
+    ->where('id_period', 1)
+    ->get();
+
+$piar_period_2 = Acta_piar::where('id_user_student', $student_id)
+    ->where('id_period', 2)
+    ->get();
+```
+
+This enables:
+- Comparing adjustments across periods
+- Evaluating effectiveness over time
+- Planning continuation or modifications
+- Creating comprehensive annual reports
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Comprehensive Assessment" icon="clipboard-list">
+    Base PIAR documents on thorough psychological evaluations and teacher observations.
+  </Card>
+  
+  <Card title="Collaborative Creation" icon="users">
+    Involve multiple teachers, the psychologist, and family members in PIAR development.
+  </Card>
+  
+  <Card title="Specific Adjustments" icon="bullseye">
+    Make adjustments concrete and actionable, not vague or generic.
+  </Card>
+  
+  <Card title="Regular Evaluation" icon="chart-line">
+    Continuously evaluate the effectiveness of adjustments and modify as needed.
+  </Card>
+  
+  <Card title="Universal Design" icon="universal-access">
+    Design DUA activities that benefit all students, not just those with identified needs.
+  </Card>
+  
+  <Card title="Documentation" icon="file-lines">
+    Maintain detailed documentation of implementation and outcomes.
+  </Card>
+  
+  <Card title="Reasonable Scope" icon="scale-balanced">
+    Ensure adjustments are reasonable, achievable, and sustainable.
+  </Card>
+  
+  <Card title="Student-Centered" icon="heart">
+    Keep the student's strengths, interests, and goals at the center of all planning.
+  </Card>
+</CardGroup>
+
+## Legal and Compliance Considerations
+
+<Note>
+  PIAR documents fulfill legal requirements for educational inclusion and reasonable adjustments. Ensure all documents are:
+  - Complete and accurate
+  - Created in a timely manner
+  - Reviewed and updated regularly
+  - Accessible to authorized personnel
+  - Maintained according to data protection regulations
+</Note>
+
+## Integration with Other Modules
+
+### From Referral to PIAR
+
+1. Teacher creates referral → Student is "activo"
+2. Psychologist evaluates → Creates report
+3. Psychologist changes state → Student is "en PIAR"
+4. Teachers create PIAR documents → Student receives adjustments
+5. Continuous monitoring → Update PIAR as needed
+
+### DUA as Alternative or Complement
+
+DUA can serve as:
+- An alternative to PIAR for students needing less individualization
+- A complement to PIAR for comprehensive support
+- A preventative approach for all students
+
+## Reporting and Analytics
+
+The system enables tracking:
+- Number of students in PIAR vs. DUA
+- PIARs created per teacher, period, or area
+- Distribution of adjustments by type
+- Effectiveness of interventions over time
+
+## Related Features
+
+- [Student Referrals](/features/student-referrals)
+- [Psycho-Orientation](/features/psycho-orientation)
+- [User Management](/features/user-management)
+- [Academic Structure](/features/academic-structure)

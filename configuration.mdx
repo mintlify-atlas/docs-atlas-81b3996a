@@ -1,0 +1,575 @@
+---
+title: Configuration
+description: Configure the Bethlemitas Student Support System for your institution
+---
+
+## Environment Configuration
+
+The system uses Laravel's environment file (`.env`) for all configuration settings. This file was created during installation and contains critical application settings.
+
+### Application Settings
+
+Configure basic application parameters in your `.env` file:
+
+```bash
+APP_NAME=Laravel
+APP_ENV=production
+APP_KEY=base64:YOUR_GENERATED_KEY
+APP_DEBUG=false
+APP_TIMEZONE=UTC
+APP_URL=https://your-domain.com
+```
+
+<ParamField path="APP_NAME" type="string" default="Laravel">
+  The application name displayed in emails and the interface
+</ParamField>
+
+<ParamField path="APP_ENV" type="string" default="local">
+  Environment type: `local`, `staging`, or `production`
+</ParamField>
+
+<ParamField path="APP_DEBUG" type="boolean" default="true">
+  Enable detailed error messages. Set to `false` in production for security
+</ParamField>
+
+<ParamField path="APP_URL" type="string" default="http://localhost">
+  The base URL where your application is accessible
+</ParamField>
+
+<Warning>
+  Always set `APP_DEBUG=false` and `APP_ENV=production` in production environments to prevent security vulnerabilities and information leaks.
+</Warning>
+
+### Localization Settings
+
+The system is configured for Spanish by default (see `.env.example` lines 8-10):
+
+```bash
+APP_LOCALE=es
+APP_FALLBACK_LOCALE=es
+APP_FAKER_LOCALE=es_ES
+```
+
+<Info>
+  The Spanish localization (`es`) is optimized for educational institutions in Spanish-speaking regions. If you need to support multiple languages, you can add translation files to `resources/lang/`.
+</Info>
+
+### Database Configuration
+
+Verify your database settings match your installation (`.env.example` lines 23-28):
+
+```bash
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=piarmanager
+DB_USERNAME=root
+DB_PASSWORD=your_secure_password
+```
+
+<Note>
+  For production environments, create a dedicated database user with limited privileges instead of using `root`. Grant only SELECT, INSERT, UPDATE, DELETE, CREATE, and ALTER permissions.
+</Note>
+
+### Session Configuration
+
+The system uses database-driven sessions for better scalability (`.env.example` lines 30-34):
+
+```bash
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+SESSION_ENCRYPT=false
+SESSION_PATH=/
+SESSION_DOMAIN=null
+```
+
+<ParamField path="SESSION_LIFETIME" type="integer" default="120">
+  Session duration in minutes. Users will be logged out after this period of inactivity.
+</ParamField>
+
+### Cache Configuration
+
+For optimal performance, the system uses database caching (`.env.example` lines 40-41):
+
+```bash
+CACHE_STORE=database
+CACHE_PREFIX=
+```
+
+For larger installations, consider using Redis for better performance:
+
+```bash
+CACHE_STORE=redis
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+```
+
+### Queue Configuration
+
+The system uses database queues for background job processing (`.env.example` line 38):
+
+```bash
+QUEUE_CONNECTION=database
+```
+
+To process queued jobs, run the queue worker:
+
+```bash
+php artisan queue:work
+```
+
+<Tip>
+  For production environments, use a process supervisor like Supervisor to keep the queue worker running continuously.
+</Tip>
+
+## Institutional Setup
+
+After configuring the environment, set up your institution's structure in the application.
+
+<Steps>
+  <Step title="Create Institution Record">
+    Log in as an administrator and create your institution record. The institution table structure is defined in `~/workspace/source/database/migrations/2024_10_01_170648_create_institution.php`:
+    
+    ```php
+    Schema::create('institution', function (Blueprint $table) {
+        $table->id();
+        $table->string('institution');
+        $table->timestamps();
+    });
+    ```
+    
+    Use Tinker to create the institution:
+    
+    ```bash
+    php artisan tinker
+    ```
+    
+    ```php
+    DB::table('institution')->insert([
+        'institution' => 'Colegio Bethlemitas',
+        'created_at' => now(),
+        'updated_at' => now()
+    ]);
+    ```
+  </Step>
+
+  <Step title="Configure Academic Degrees">
+    Set up the grade levels (degrees) offered by your institution. Access the degrees management interface at `/create/degree` (see `~/workspace/source/routes/web.php:105`).
+    
+    The degrees table stores:
+    - Grade level names (e.g., "Sexto", "Séptimo", "Octavo")
+    - Institutional associations
+    
+    Reference migration: `~/workspace/source/database/migrations/2024_10_01_155113_create_degrees_table.php`
+  </Step>
+
+  <Step title="Set Up Groups (Classes)">
+    Create classroom groups for each degree. Access groups management at `/create/group` (routes/web.php:100).
+    
+    Groups represent individual classes within a grade level (e.g., "6A", "6B").
+    
+    Reference migration: `~/workspace/source/database/migrations/2024_10_01_155315_create_groups_table.php`
+  </Step>
+
+  <Step title="Define Academic Areas">
+    Configure subject areas taught at your institution at `/create/area` (routes/web.php:110).
+    
+    Areas represent academic subjects (e.g., "Matemáticas", "Lenguaje", "Ciencias Naturales").
+    
+    Reference migration: `~/workspace/source/database/migrations/2024_10_01_155313_create_areas_table.php`
+  </Step>
+
+  <Step title="Configure Academic Periods">
+    Set up academic periods (terms/semesters) using the PeriodSeeder or through the database.
+    
+    Periods track different academic terms throughout the school year.
+    
+    Reference migration: `~/workspace/source/database/migrations/2024_10_01_155216_create_periods_table.php`
+  </Step>
+</Steps>
+
+## Role and Permission Setup
+
+The system uses Spatie Laravel Permission for role-based access control. Configuration is stored in `~/workspace/source/config/permission.php`.
+
+### Understanding System Roles
+
+Four roles are automatically created during seeding (see `~/workspace/source/database/seeders/RolSeeder.php`):
+
+<CodeGroup>
+```php RolSeeder.php
+// Create roles
+$coordinador = Role::create(['name' => 'coordinador']);
+$docente = Role::create(['name' => 'docente']);
+$psicoorientador = Role::create(['name' => 'psicoorientador']);
+$estudiante = Role::create(['name' => 'estudiante']);
+
+// Create permissions
+Permission::create(['name' => 'create_user']);
+
+$coordinador->givePermissionTo(['create_user']);
+$docente->givePermissionTo(['create_user']);
+$psicoorientador->givePermissionTo(['create_user']);
+```
+</CodeGroup>
+
+### Role Capabilities
+
+<Tabs>
+  <Tab title="Coordinador">
+    **Full administrative access** including:
+    
+    - Create, edit, and delete users (`/create/user`, `/store/user`)
+    - Manage degrees, groups, and areas
+    - Configure institutional settings
+    - Access all system modules
+    
+    Routes protected by `RoleMiddleware` (see `~/workspace/source/routes/web.php:91-114`)
+  </Tab>
+  
+  <Tab title="Docente">
+    **Teacher capabilities** including:
+    
+    - Create student referrals (`/create/referral`)
+    - View remitted students (`/index/students/remitted`)
+    - Edit student information
+    - Add observation minutes
+    
+    Routes protected by `RoleDocenteMiddleware` (routes/web.php:122-129)
+  </Tab>
+  
+  <Tab title="Psicoorientador">
+    **Psycho-orientator privileges** including:
+    
+    - Review and process referrals (`/details/referral/{id}`)
+    - Create PIAR and DUA plans
+    - Manage student characteristics
+    - Generate reports (`/report/student/{id}`)
+    - View student history (`/student/history/{id}`)
+    - Accept students to PIAR/DUA programs
+    - Access student lists by state (active, PIAR, DUA)
+    
+    Routes protected by `RolePsicoorientadorMiddleware` (routes/web.php:158-205)
+  </Tab>
+  
+  <Tab title="Estudiante">
+    **Student role** for future student portal features.
+    
+    Currently, students are managed as records rather than active users, but this role supports future self-service capabilities.
+  </Tab>
+</Tabs>
+
+### Assigning Roles to Users
+
+When creating users through the system, assign appropriate roles:
+
+```php
+use Spatie\Permission\Models\Role;
+
+// Assign role to teacher
+$teacher = UsersTeacher::find($teacherId);
+$teacher->assignRole('docente');
+
+// Assign role to psycho-orientator
+$psico = UsersTeacher::find($psicoId);
+$psico->assignRole('psicoorientador');
+```
+
+<Info>
+  Both teachers and psycho-orientators use the `users_teachers` table (see migration at `~/workspace/source/database/migrations/2024_10_02_130129_create_users_teachers_table.php`). The distinction is made through role assignment.
+</Info>
+
+## User Account Configuration
+
+Create initial user accounts for your institution.
+
+### Creating Administrator Account
+
+Create the first coordinador account via Tinker:
+
+```bash
+php artisan tinker
+```
+
+```php
+use App\Models\UsersTeacher;
+use Spatie\Permission\Models\Role;
+use Illuminate\Support\Facades\Hash;
+
+$coordinator = UsersTeacher::create([
+    'number_documment' => 1234567890,
+    'name' => 'Admin',
+    'last_name' => 'User',
+    'email' => 'admin@school.edu',
+    'password' => Hash::make('secure_password'),
+    'id_state' => 1, // Active state
+    'id_institution' => 1
+]);
+
+$coordinator->assignRole('coordinador');
+```
+
+<Warning>
+  Replace `secure_password` with a strong password. Never use default or weak passwords in production.
+</Warning>
+
+### Teacher Account Structure
+
+Teacher accounts include (see `~/workspace/source/database/migrations/2024_10_02_130129_create_users_teachers_table.php`):
+
+- **number_documment**: Unique identification number
+- **name** and **last_name**: Full name
+- **email**: Login credential and communication
+- **password**: Bcrypt hashed (12 rounds per `.env.example` line 15)
+- **group_director**: Optional group assignment for homeroom teachers
+- **id_institution**: Institution association
+- **id_state**: Current employment state
+- **signature**: Optional digital signature for documents
+
+### Student Account Structure
+
+Student records include (see `~/workspace/source/database/migrations/2024_10_02_130130_create_users_students_table.php`):
+
+- **number_documment**: Student ID number
+- **name** and **last_name**: Full name
+- **age**, **birthplace**, **address**: Demographic data
+- **type_documment**: TI (Tarjeta de Identidad), CC (Cédula de Ciudadanía), or RC (Registro Civil)
+- **phone** and **email**: Contact information
+- **victim_conflict**: Boolean flag for conflict victim status
+- **id_degree** and **id_group**: Academic placement
+- **sent_by**: Reference to teacher who created referral
+- **id_state**: Current support state (activo, en PIAR, en DUA)
+- **activation_period**: Academic period when activated
+- **id_institution**: Institution association
+
+## Student State Management
+
+The system tracks students through three states defined in `~/workspace/source/database/seeders/StateSeeder.php`:
+
+<CodeGroup>
+```php StateSeeder.php
+// Active state - regular curriculum
+$activo = new State;
+$activo->state = 'activo';
+$activo->save();
+
+// PIAR state - individualized plan
+$en_piar = new State;
+$en_piar->state = 'en PIAR';
+$en_piar->save();
+
+// DUA state - universal design
+$en_dua = new State;
+$en_dua->state = 'en DUA';
+$en_dua->save();
+```
+</CodeGroup>
+
+### State Transitions
+
+<Steps>
+  <Step title="Initial State: Activo">
+    All students begin in the "activo" state when enrolled.
+  </Step>
+  
+  <Step title="Referral Created">
+    Teachers create referrals for students needing support (see `~/workspace/source/database/migrations/2024_10_02_130144_create_referrals_table.php`).
+  </Step>
+  
+  <Step title="Psycho-Orientator Review">
+    Psycho-orientators review referrals and determine appropriate intervention.
+  </Step>
+  
+  <Step title="Transition to PIAR">
+    Students requiring individualized plans transition to "en PIAR" state via the `/accept/student` route (routes/web.php:203).
+  </Step>
+  
+  <Step title="Alternative: DUA">
+    Students benefiting from universal design interventions move to "en DUA" state.
+  </Step>
+</Steps>
+
+## Mail Configuration
+
+Configure email settings for password resets and notifications (`.env.example` lines 50-57):
+
+```bash
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=your-app-password
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS="noreply@yourschool.edu"
+MAIL_FROM_NAME="${APP_NAME}"
+```
+
+<Note>
+  The default configuration uses `MAIL_MAILER=log` which writes emails to `storage/logs/laravel.log` for testing. Change to `smtp` for production.
+</Note>
+
+### Password Reset Flow
+
+The system includes password reset functionality (see `~/workspace/source/routes/web.php:37-53`):
+
+1. User requests reset at `/forgot-password`
+2. System sends reset link via email
+3. User clicks link to `/reset-password/{token}`
+4. User sets new password
+
+The `password_reset_tokens` table is created in the teachers migration (lines 47-51).
+
+## Security Hardening
+
+### Authentication Configuration
+
+Authentication settings are in `~/workspace/source/config/auth.php`. Key security settings:
+
+```bash
+BCRYPT_ROUNDS=12
+```
+
+This determines password hashing strength (`.env.example` line 15).
+
+### Middleware Protection
+
+The system uses multiple middleware layers (see `~/workspace/source/routes/web.php`):
+
+- **PreventBackHistoryMiddleware**: Prevents browser back-button security issues
+- **RoleMiddleware**: Enforces role-based access
+- **RoleDocenteMiddleware**: Teacher-specific routes
+- **RolePsicoorientadorMiddleware**: Psycho-orientator routes
+- **RolePsicoorientadorAndDocenteMiddleware**: Shared access routes
+
+### Session Security
+
+Enable session encryption for sensitive data:
+
+```bash
+SESSION_ENCRYPT=true
+```
+
+<Warning>
+  Enabling session encryption after users have active sessions will invalidate those sessions. Plan this change during maintenance windows.
+</Warning>
+
+## Performance Optimization
+
+### Cache Configuration
+
+Clear and optimize caches after configuration changes:
+
+```bash
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+### Database Optimization
+
+For production environments:
+
+```bash
+php artisan optimize
+```
+
+This combines:
+- Configuration caching
+- Route caching  
+- View compilation
+
+### Queue Workers
+
+Set up queue workers for background processing:
+
+```bash
+php artisan queue:work --queue=default --tries=3
+```
+
+<Tip>
+  Use a process supervisor like Supervisor to ensure queue workers restart automatically if they crash.
+</Tip>
+
+## Logging Configuration
+
+Configure logging behavior (`.env.example` lines 17-20):
+
+```bash
+LOG_CHANNEL=stack
+LOG_STACK=single
+LOG_DEPRECATIONS_CHANNEL=null
+LOG_LEVEL=debug
+```
+
+For production, use:
+
+```bash
+LOG_LEVEL=error
+LOG_STACK=daily
+```
+
+Logs are stored in `storage/logs/laravel.log` with daily rotation.
+
+## Verification Checklist
+
+Before going live, verify:
+
+<AccordionGroup>
+  <Accordion title="Environment Configuration">
+    - [ ] `APP_ENV=production`
+    - [ ] `APP_DEBUG=false`
+    - [ ] `APP_URL` matches your domain
+    - [ ] `APP_KEY` is set and unique
+    - [ ] Database credentials are correct
+  </Accordion>
+  
+  <Accordion title="Security Settings">
+    - [ ] Strong database passwords
+    - [ ] HTTPS enabled on production domain
+    - [ ] Session encryption configured
+    - [ ] Mail configuration tested
+    - [ ] File permissions set correctly (775 for storage)
+  </Accordion>
+  
+  <Accordion title="Institutional Data">
+    - [ ] Institution record created
+    - [ ] Degrees/grades configured
+    - [ ] Groups/classes set up
+    - [ ] Academic areas defined
+    - [ ] Periods created for current school year
+  </Accordion>
+  
+  <Accordion title="User Accounts">
+    - [ ] Administrator account created with coordinador role
+    - [ ] Initial teacher accounts set up
+    - [ ] Psycho-orientator accounts configured
+    - [ ] Roles properly assigned
+  </Accordion>
+  
+  <Accordion title="Performance">
+    - [ ] Caches optimized
+    - [ ] Queue worker running
+    - [ ] Log rotation configured
+    - [ ] Database indexes present
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+With configuration complete, you're ready to start using the system. Explore the user guides to learn about daily operations.
+
+<CardGroup cols={2}>
+  <Card title="User Management" icon="users">
+    Learn how to create and manage teacher and student accounts
+  </Card>
+  <Card title="Referral Process" icon="file-medical">
+    Understand the student referral and intervention workflow
+  </Card>
+  <Card title="PIAR Creation" icon="clipboard-list">
+    Create individualized adjustment plans for students
+  </Card>
+  <Card title="Reporting" icon="chart-line">
+    Generate reports and track student progress
+  </Card>
+</CardGroup>

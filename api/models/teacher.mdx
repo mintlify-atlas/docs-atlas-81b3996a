@@ -1,0 +1,435 @@
+---
+title: "Users_teacher Model"
+description: "Teacher/staff user model with authentication, role management, and academic relationships"
+---
+
+## Overview
+
+The `Users_teacher` model represents teaching staff and administrators in the Bethlemitas Student Support System. It handles authentication, role-based permissions, academic assignments, and relationships with students and courses.
+
+**Namespace:** `App\Models\Users_teacher`
+
+**Extends:** `Illuminate\Foundation\Auth\User` (Authenticatable)
+
+**Traits:**
+- `HasFactory` - Enables model factories for testing
+- `HasRoles` (Spatie) - Provides role-based permissions
+- `Notifiable` - Enables notifications
+
+## Model Definition
+
+```php
+class Users_teacher extends Authenticatable
+{
+    use HasFactory, HasRoles, Notifiable;
+
+    protected $table = 'users_teachers';
+    protected $guard_name = 'web';
+}
+```
+
+## Fillable Fields
+
+These fields can be mass-assigned when creating or updating teacher records.
+
+<ParamField body="name" type="string" required>
+  Teacher's first name
+</ParamField>
+
+<ParamField body="lastname" type="string" required>
+  Teacher's last name
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  Teacher's email address (used for authentication)
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Hashed password for authentication
+</ParamField>
+
+<ParamField body="document" type="string" required>
+  Teacher's identification document number
+</ParamField>
+
+<ParamField body="phone" type="string">
+  Teacher's contact phone number
+</ParamField>
+
+<ParamField body="id_state" type="integer">
+  Foreign key to State model (1 = active, 2 = PIAR)
+</ParamField>
+
+<ParamField body="group_director" type="integer">
+  Foreign key to Group model - indicates if teacher is a group director
+</ParamField>
+
+## Hidden Fields
+
+These fields are automatically hidden from JSON serialization for security.
+
+<ResponseField name="password" type="string">
+  Hidden from all array/JSON responses
+</ResponseField>
+
+<ResponseField name="remember_token" type="string">
+  Hidden from all array/JSON responses
+</ResponseField>
+
+## Basic Relationships
+
+### BelongsTo Relationships
+
+<Expandable title="state()">
+  Returns the current state/status of the teacher.
+
+  ```php
+  public function state()
+  {
+      return $this->belongsTo(State::class, 'id_state');
+  }
+  ```
+
+  **Foreign Key:** `id_state`
+  
+  **Related Model:** `State`
+
+  **Note:** State 1 = active, State 2 = PIAR
+
+  **Usage:**
+  ```php
+  $teacher = Users_teacher::find(1);
+  $state = $teacher->state;
+  echo $state->name; // "Active" or "PIAR"
+  ```
+</Expandable>
+
+<Expandable title="director()">
+  Returns the group that this teacher directs.
+
+  ```php
+  public function director()
+  {
+      return $this->belongsTo(Group::class, 'group_director');
+  }
+  ```
+
+  **Foreign Key:** `group_director`
+  
+  **Related Model:** `Group`
+
+  **Usage:**
+  ```php
+  $teacher = Users_teacher::find(1);
+  if ($teacher->group_director) {
+      $group = $teacher->director;
+      echo "Director of: " . $group->name;
+  }
+  ```
+</Expandable>
+
+## Academic Relationships
+
+### BelongsToMany Relationships
+
+<Expandable title="areas()">
+  Returns all academic areas/subjects assigned to this teacher.
+
+  ```php
+  public function areas()
+  {
+      return $this->belongsToMany(
+          Area::class,
+          'teachers_areas_groups',
+          'id_teacher',
+          'id_area'
+      )->withPivot('id_group');
+  }
+  ```
+
+  **Pivot Table:** `teachers_areas_groups`
+  
+  **Related Model:** `Area`
+  
+  **Pivot Data:** Includes `id_group` to show which group the teacher teaches this area to
+
+  **Usage:**
+  ```php
+  $teacher = Users_teacher::find(1);
+  $areas = $teacher->areas;
+  
+  foreach ($areas as $area) {
+      echo $area->name; // "Mathematics", "Science", etc.
+      echo "Group: " . $area->pivot->id_group;
+  }
+  ```
+</Expandable>
+
+<Expandable title="groups()">
+  Returns all groups/classes assigned to this teacher.
+
+  ```php
+  public function groups()
+  {
+      return $this->belongsToMany(
+          Group::class,
+          'teachers_areas_groups',
+          'id_teacher',
+          'id_group'
+      )->withPivot('id_area');
+  }
+  ```
+
+  **Pivot Table:** `teachers_areas_groups`
+  
+  **Related Model:** `Group`
+  
+  **Pivot Data:** Includes `id_area` to show which subject the teacher teaches to this group
+
+  **Usage:**
+  ```php
+  $teacher = Users_teacher::find(1);
+  $groups = $teacher->groups;
+  
+  foreach ($groups as $group) {
+      echo $group->name; // "6A", "7B", etc.
+      echo "Teaching area: " . $group->pivot->id_area;
+  }
+  ```
+</Expandable>
+
+<Expandable title="degrees()">
+  Returns all academic degrees/grades assigned to this teacher (for psycho-orientators/PIAR).
+
+  ```php
+  public function degrees()
+  {
+      return $this->belongsToMany(
+          Degree::class,
+          'users_load_degrees',
+          'id_user',
+          'id_degree'
+      );
+  }
+  ```
+
+  **Pivot Table:** `users_load_degrees`
+  
+  **Related Model:** `Degree`
+
+  **Usage:**
+  ```php
+  $psychologist = Users_teacher::find(1);
+  $degrees = $psychologist->degrees;
+  
+  foreach ($degrees as $degree) {
+      echo $degree->name; // "6th Grade", "7th Grade", etc.
+  }
+  ```
+</Expandable>
+
+### HasMany Relationships
+
+<Expandable title="areasGroups()">
+  Returns all records from the pivot table linking teachers to areas and groups.
+
+  ```php
+  public function areasGroups()
+  {
+      return $this->hasMany(Teachers_areas_groups::class, 'id_teacher');
+  }
+  ```
+
+  **Foreign Key:** `id_teacher`
+  
+  **Related Model:** `Teachers_areas_groups`
+
+  **Usage:**
+  ```php
+  $teacher = Users_teacher::find(1);
+  $assignments = $teacher->areasGroups;
+  
+  foreach ($assignments as $assignment) {
+      echo "Area: {$assignment->id_area}, Group: {$assignment->id_group}";
+  }
+  ```
+</Expandable>
+
+<Expandable title="loadDegrees()">
+  Returns all degree assignments from the pivot table (for psycho-orientators).
+
+  ```php
+  public function loadDegrees()
+  {
+      return $this->hasMany(Users_load_degree::class, 'id_user');
+  }
+  ```
+
+  **Foreign Key:** `id_user`
+  
+  **Related Model:** `Users_load_degree`
+
+  **Usage:**
+  ```php
+  $psychologist = Users_teacher::find(1);
+  $degreeAssignments = $psychologist->loadDegrees;
+  ```
+</Expandable>
+
+## Query Scopes
+
+Reusable query filters for common teacher queries.
+
+<Expandable title="scopeActivos()">
+  Filters to only active teachers (id_state = 1).
+
+  ```php
+  public function scopeActivos($query)
+  {
+      return $query->where('id_state', 1);
+  }
+  ```
+
+  **Usage:**
+  ```php
+  $activeTeachers = Users_teacher::activos()->get();
+  ```
+</Expandable>
+
+<Expandable title="scopePiar()">
+  Filters to only PIAR teachers (id_state = 2).
+
+  ```php
+  public function scopePiar($query)
+  {
+      return $query->where('id_state', 2);
+  }
+  ```
+
+  **Usage:**
+  ```php
+  $piarTeachers = Users_teacher::piar()->get();
+  ```
+</Expandable>
+
+<Expandable title="scopeDocentesPsicoCoordinador()">
+  Filters to teachers with specific roles: docente, psicoorientador, or coordinador.
+
+  ```php
+  public function scopeDocentesPsicoCoordinador($query)
+  {
+      return $query->whereHas('roles', function ($q) {
+          $q->whereIn('name', [
+              'docente',
+              'psicoorientador',
+              'coordinador'
+          ]);
+      });
+  }
+  ```
+
+  **Usage:**
+  ```php
+  $staff = Users_teacher::docentesPsicoCoordinador()->get();
+  ```
+</Expandable>
+
+## Usage Examples
+
+### Creating a Teacher
+
+```php
+use App\Models\Users_teacher;
+use Illuminate\Support\Facades\Hash;
+
+$teacher = Users_teacher::create([
+    'name' => 'María',
+    'lastname' => 'García',
+    'email' => 'maria.garcia@bethlemitas.edu.co',
+    'password' => Hash::make('secure-password'),
+    'document' => '98765432',
+    'phone' => '3009876543',
+    'id_state' => 1, // Active
+    'group_director' => null,
+]);
+
+// Assign role
+$teacher->assignRole('docente');
+```
+
+### Querying with Scopes
+
+```php
+// Get all active teachers who are psycho-orientators
+$psychologists = Users_teacher::activos()
+    ->whereHas('roles', function ($q) {
+        $q->where('name', 'psicoorientador');
+    })
+    ->get();
+
+// Get all active teaching staff
+$staff = Users_teacher::activos()
+    ->docentesPsicoCoordinador()
+    ->get();
+```
+
+### Working with Relationships
+
+```php
+// Get teacher with all academic assignments
+$teacher = Users_teacher::with([
+    'areas',
+    'groups',
+    'director',
+    'state'
+])->find(1);
+
+// Get teaching schedule
+foreach ($teacher->areasGroups as $assignment) {
+    $area = Area::find($assignment->id_area);
+    $group = Group::find($assignment->id_group);
+    echo "{$teacher->name} teaches {$area->name} to group {$group->name}";
+}
+
+// Check if teacher is a group director
+if ($teacher->group_director) {
+    echo "{$teacher->name} directs group: {$teacher->director->name}";
+}
+```
+
+### Authentication
+
+```php
+// Login
+use Illuminate\Support\Facades\Auth;
+
+$credentials = [
+    'email' => 'maria.garcia@bethlemitas.edu.co',
+    'password' => 'password123'
+];
+
+if (Auth::guard('web')->attempt($credentials)) {
+    $teacher = Auth::user();
+    echo "Welcome, {$teacher->name}!";
+}
+```
+
+### Role-Based Queries
+
+```php
+// Get all coordinators
+$coordinators = Users_teacher::role('coordinador')->get();
+
+// Check if teacher has specific role
+$teacher = Users_teacher::find(1);
+if ($teacher->hasRole('psicoorientador')) {
+    // Access psycho-orientation features
+    $degrees = $teacher->degrees;
+}
+```
+
+## Source Code Reference
+
+View the complete model implementation:
+
+**File:** `/home/daytona/workspace/source/app/Models/Users_teacher.php:10-130`

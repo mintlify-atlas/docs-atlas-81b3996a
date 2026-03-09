@@ -1,0 +1,434 @@
+---
+title: "Psychoorientation Model"
+description: "Psychological orientation records documenting student evaluations and recommendations"
+---
+
+## Overview
+
+The `Psychoorientation` model represents psychological orientation reports created by school psychologists (psicoorientadores) for students requiring specialized support. It documents evaluations, interventions, and recommendations.
+
+**Namespace:** `App\Models\Psychoorientation`
+
+**Extends:** `Illuminate\Database\Eloquent\Model`
+
+**Traits:**
+- `HasFactory` - Enables model factories for testing
+
+## Model Definition
+
+```php
+class Psychoorientation extends Model
+{
+    use HasFactory;
+}
+```
+
+## Fillable Fields
+
+These fields are permitted for mass assignment when creating or updating psycho-orientation records.
+
+<ParamField body="psychologist_writes" type="integer" required>
+  Foreign key to Users_teacher model - the psychologist who wrote the report
+</ParamField>
+
+<ParamField body="id_user_student" type="integer" required>
+  Foreign key to Users_student model - the student being evaluated
+</ParamField>
+
+<ParamField body="age_student" type="integer">
+  Student's age at the time of evaluation
+</ParamField>
+
+<ParamField body="group_student" type="string">
+  Student's class group (e.g., "6A", "7B")
+</ParamField>
+
+<ParamField body="director_group_student" type="string">
+  Name of the student's group director/homeroom teacher
+</ParamField>
+
+<ParamField body="title_report" type="string" required>
+  Title or subject of the psychological report
+</ParamField>
+
+<ParamField body="reason_inquiry" type="text" required>
+  Reason for the psychological inquiry or evaluation
+</ParamField>
+
+<ParamField body="recomendations" type="text">
+  Professional recommendations and suggested interventions
+</ParamField>
+
+<ParamField body="annex_one" type="string">
+  File path or reference to an attached document (evaluations, test results, etc.)
+  
+  **Note:** This is a critical field for document attachments
+</ParamField>
+
+## Relationships
+
+### BelongsTo Relationships
+
+<Expandable title="user_psychology()">
+  Returns the psychologist/psycho-orientator who wrote the report.
+
+  ```php
+  public function user_psychology()
+  {
+      return $this->belongsTo(Users_teacher::class, 'psychologist_writes');
+  }
+  ```
+
+  **Foreign Key:** `psychologist_writes`
+  
+  **Related Model:** [Users_teacher](/api/models/teacher)
+
+  **Usage:**
+  ```php
+  $report = Psychoorientation::find(1);
+  $psychologist = $report->user_psychology;
+  
+  echo "Written by: {$psychologist->name} {$psychologist->lastname}";
+  echo "Email: {$psychologist->email}";
+  ```
+</Expandable>
+
+<Expandable title="user_student()">
+  Returns the student who was evaluated.
+
+  ```php
+  public function user_student()
+  {
+      return $this->belongsTo(Users_student::class, 'id_user_student');
+  }
+  ```
+
+  **Foreign Key:** `id_user_student`
+  
+  **Related Model:** [Users_student](/api/models/student)
+
+  **Usage:**
+  ```php
+  $report = Psychoorientation::find(1);
+  $student = $report->user_student;
+  
+  echo "Student: {$student->name} {$student->last_name}";
+  echo "Current Age: {$student->age}";
+  echo "Group: {$student->group->name}";
+  ```
+</Expandable>
+
+## Usage Examples
+
+### Creating a Psycho-orientation Report
+
+```php
+use App\Models\Psychoorientation;
+use App\Models\Users_student;
+
+$student = Users_student::find(15);
+
+$report = Psychoorientation::create([
+    'psychologist_writes' => 5, // ID of the psychologist
+    'id_user_student' => $student->id,
+    'age_student' => $student->age,
+    'group_student' => $student->group->name,
+    'director_group_student' => $student->group->director->name ?? 'N/A',
+    'title_report' => 'Evaluación de adaptación escolar',
+    'reason_inquiry' => 'El estudiante presenta dificultades en la integración social con sus compañeros y muestra signos de ansiedad durante actividades grupales.',
+    'recomendations' => 'Se recomienda: 1) Implementar actividades de integración gradual, 2) Seguimiento semanal por parte del psicoorientador, 3) Reunión con padres de familia para establecer estrategias de apoyo en casa.',
+    'annex_one' => 'uploads/psycho/evaluation_2024_03_15.pdf',
+]);
+```
+
+### Querying Psycho-orientation Reports
+
+```php
+// Get all reports with psychologist and student information
+$reports = Psychoorientation::with([
+    'user_psychology',
+    'user_student.group',
+    'user_student.degree'
+])
+->orderBy('created_at', 'desc')
+->get();
+
+foreach ($reports as $report) {
+    echo "Title: {$report->title_report}";
+    echo "Student: {$report->user_student->name}";
+    echo "Psychologist: {$report->user_psychology->name}";
+    echo "Date: {$report->created_at->format('Y-m-d')}";
+    echo "---";
+}
+```
+
+### Finding Reports by Student
+
+```php
+use App\Models\Users_student;
+
+// Get all psycho-orientation reports for a specific student
+$student = Users_student::find(15);
+$reports = $student->psychoorientations()
+    ->with('user_psychology')
+    ->orderBy('created_at', 'desc')
+    ->get();
+
+echo "Total reports for {$student->name}: " . $reports->count();
+
+foreach ($reports as $report) {
+    echo "Date: {$report->created_at->format('Y-m-d')}";
+    echo "Title: {$report->title_report}";
+    echo "By: {$report->user_psychology->name}";
+}
+```
+
+### Finding Reports by Psychologist
+
+```php
+use App\Models\Users_teacher;
+
+// Get all reports written by a specific psychologist
+$psychologist = Users_teacher::role('psicoorientador')->find(5);
+
+$reports = Psychoorientation::where('psychologist_writes', $psychologist->id)
+    ->with('user_student')
+    ->orderBy('created_at', 'desc')
+    ->get();
+
+echo "Total reports by {$psychologist->name}: " . $reports->count();
+
+foreach ($reports as $report) {
+    echo "Student: {$report->user_student->name}";
+    echo "Title: {$report->title_report}";
+    echo "Date: {$report->created_at->format('d/m/Y')}";
+}
+```
+
+### Filtering by Date Range
+
+```php
+use Carbon\Carbon;
+
+// Get reports from the current academic year
+$yearStart = Carbon::parse('2024-01-01');
+$yearEnd = Carbon::parse('2024-12-31');
+
+$yearReports = Psychoorientation::whereBetween('created_at', [$yearStart, $yearEnd])
+    ->with(['user_student', 'user_psychology'])
+    ->get();
+
+// Get reports from the last 3 months
+$recentReports = Psychoorientation::where('created_at', '>=', Carbon::now()->subMonths(3))
+    ->orderBy('created_at', 'desc')
+    ->get();
+```
+
+### Updating a Report
+
+```php
+$report = Psychoorientation::find(1);
+
+$report->update([
+    'recomendations' => $report->recomendations . '\n\nActualización (15/03/2024): Se observa progreso significativo. El estudiante ha mostrado mejor integración con el grupo.',
+    'annex_one' => 'uploads/psycho/evaluation_2024_03_15_updated.pdf',
+]);
+```
+
+### Searching Reports
+
+```php
+// Search by title, reason, or recommendations
+$keyword = 'ansiedad';
+
+$searchResults = Psychoorientation::where('title_report', 'like', "%{$keyword}%")
+    ->orWhere('reason_inquiry', 'like', "%{$keyword}%")
+    ->orWhere('recomendations', 'like', "%{$keyword}%")
+    ->with(['user_student', 'user_psychology'])
+    ->get();
+```
+
+### Reports by Group
+
+```php
+// Get all reports for students in a specific group
+$groupName = '6A';
+
+$groupReports = Psychoorientation::where('group_student', $groupName)
+    ->with('user_student')
+    ->orderBy('created_at', 'desc')
+    ->get();
+
+echo "Total reports for group {$groupName}: " . $groupReports->count();
+```
+
+### Working with Attachments
+
+```php
+$report = Psychoorientation::find(1);
+
+// Check if report has an attachment
+if ($report->annex_one) {
+    $filePath = storage_path('app/public/' . $report->annex_one);
+    
+    if (file_exists($filePath)) {
+        echo "Attachment available: {$report->annex_one}";
+        // Generate download link or process file
+    }
+}
+
+// Add attachment to existing report
+use Illuminate\Support\Facades\Storage;
+
+$file = $request->file('attachment');
+$path = $file->store('uploads/psycho', 'public');
+
+$report->update([
+    'annex_one' => $path
+]);
+```
+
+### Statistics and Reports
+
+```php
+// Get report count per psychologist
+$psychologistReportCounts = Psychoorientation::selectRaw('psychologist_writes, COUNT(*) as total')
+    ->groupBy('psychologist_writes')
+    ->with('user_psychology')
+    ->orderBy('total', 'desc')
+    ->get();
+
+foreach ($psychologistReportCounts as $stat) {
+    echo "{$stat->user_psychology->name}: {$stat->total} reports";
+}
+
+// Students with multiple psycho-orientation sessions
+$studentReportCounts = Psychoorientation::selectRaw('id_user_student, COUNT(*) as total')
+    ->groupBy('id_user_student')
+    ->having('total', '>=', 3)
+    ->with('user_student')
+    ->get();
+```
+
+## Common Queries
+
+### Get All Reports with Full Context
+
+```php
+$reports = Psychoorientation::with([
+    'user_student.group',
+    'user_student.degree',
+    'user_student.teacher',
+    'user_psychology'
+])
+->orderBy('created_at', 'desc')
+->paginate(15);
+```
+
+### Students Currently Under Observation
+
+```php
+use App\Models\Users_student;
+
+// Students with recent psycho-orientation reports (last 30 days)
+$studentsUnderObservation = Users_student::whereHas('psychoorientations', function ($query) {
+    $query->where('created_at', '>=', now()->subDays(30));
+})
+->withCount('psychoorientations')
+->with('psychoorientations', function ($query) {
+    $query->latest()->limit(1);
+})
+->get();
+```
+
+### Follow-up Required
+
+```php
+// Students with referrals but no recent psycho-orientation
+$needsFollowup = Users_student::whereHas('referrals', function ($query) {
+    $query->where('created_at', '>=', now()->subDays(30));
+})
+->whereDoesntHave('psychoorientations', function ($query) {
+    $query->where('created_at', '>=', now()->subDays(14));
+})
+->with(['latestReferral', 'psychoorientations'])
+->get();
+```
+
+### Psychologist Workload
+
+```php
+use App\Models\Users_teacher;
+
+// Get psychologists with their report counts
+$psychologists = Users_teacher::role('psicoorientador')
+    ->withCount(['psychoorientations' => function ($query) {
+        // Count reports from current month
+        $query->whereMonth('created_at', now()->month)
+              ->whereYear('created_at', now()->year);
+    }])
+    ->get();
+
+foreach ($psychologists as $psychologist) {
+    echo "{$psychologist->name}: {$psychologist->psychoorientations_count} reports this month";
+}
+```
+
+### Monthly Report Summary
+
+```php
+use Carbon\Carbon;
+
+$month = Carbon::now()->month;
+$year = Carbon::now()->year;
+
+$monthlyStats = [
+    'total_reports' => Psychoorientation::whereMonth('created_at', $month)
+        ->whereYear('created_at', $year)
+        ->count(),
+    'students_evaluated' => Psychoorientation::whereMonth('created_at', $month)
+        ->whereYear('created_at', $year)
+        ->distinct('id_user_student')
+        ->count('id_user_student'),
+    'active_psychologists' => Psychoorientation::whereMonth('created_at', $month)
+        ->whereYear('created_at', $year)
+        ->distinct('psychologist_writes')
+        ->count('psychologist_writes'),
+];
+```
+
+## Integration with Referrals
+
+```php
+// Get students with referrals and their psycho-orientation follow-up
+$studentCases = Users_student::with([
+    'referrals' => function ($query) {
+        $query->orderBy('created_at', 'desc');
+    },
+    'psychoorientations' => function ($query) {
+        $query->orderBy('created_at', 'desc');
+    }
+])
+->has('referrals')
+->get();
+
+foreach ($studentCases as $student) {
+    echo "Student: {$student->name}";
+    echo "Referrals: {$student->referrals->count()}";
+    echo "Psycho-orientations: {$student->psychoorientations->count()}";
+    
+    // Check if latest referral has been followed up
+    $latestReferral = $student->referrals->first();
+    $latestPsycho = $student->psychoorientations->first();
+    
+    if ($latestReferral && (!$latestPsycho || $latestReferral->created_at > $latestPsycho->created_at)) {
+        echo "⚠ Needs psycho-orientation follow-up";
+    }
+}
+```
+
+## Source Code Reference
+
+View the complete model implementation:
+
+**File:** `/home/daytona/workspace/source/app/Models/Psychoorientation.php:8-42`

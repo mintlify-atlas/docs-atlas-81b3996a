@@ -1,0 +1,616 @@
+---
+title: User Management
+description: Comprehensive system for creating and managing teachers, psychologists, and their academic assignments.
+---
+
+## Overview
+
+The User Management module enables academic coordinators to create and manage staff accounts, including teachers and psychologists. The system handles complex academic assignments such as subject areas, groups, grade levels, and specialized roles.
+
+## User Types
+
+The system manages two primary user types through the `Users_teacher` model:
+
+<CardGroup cols={2}>
+  <Card title="Docente (Teacher)" icon="chalkboard-user">
+    - Teaches specific subject areas
+    - Assigned to multiple groups
+    - May serve as group director
+    - Can create student referrals
+  </Card>
+  
+  <Card title="Psicoorientador (Psychologist)" icon="user-doctor">
+    - Assigned to specific grade levels
+    - Reviews student referrals
+    - Creates psychological reports
+    - Manages PIAR and DUA processes
+  </Card>
+</CardGroup>
+
+## Users_teacher Model
+
+The `Users_teacher` model (`app/Models/Users_teacher.php:10`) extends Laravel's Authenticatable class:
+
+```php
+protected $fillable = [
+    'name',
+    'lastname',
+    'email',
+    'password',
+    'document',
+    'phone',
+    'id_state',
+    'group_director',
+];
+```
+
+### Key Features
+
+- **Role-Based Access**: Uses Spatie's Laravel Permission package
+- **State Management**: Active (1) or Suspended (2)
+- **Relationships**: Complex many-to-many relationships with areas, groups, and degrees
+
+## Creating Users
+
+### Creating a Teacher
+
+<Steps>
+  <Step title="Access User Creation Form">
+    Navigate to `/create/user` (academic coordinator only).
+    
+    ```php
+    // Route: routes/web.php:93
+    Route::get('/create/user', [CreateController::class, 'create_user'])
+        ->name('create.user');
+    ```
+  </Step>
+  
+  <Step title="Select Role">
+    Choose "docente" as the role type.
+  </Step>
+  
+  <Step title="Enter Basic Information">
+    Fill out required fields:
+    - Document number (1-11 digits, unique)
+    - First name
+    - Last name
+    - Email address (unique)
+  </Step>
+  
+  <Step title="Assign Academic Areas">
+    Select the subject areas the teacher will teach (e.g., Mathematics, Science).
+  </Step>
+  
+  <Step title="Assign Groups">
+    Select which groups the teacher will be responsible for.
+  </Step>
+  
+  <Step title="Map Areas to Groups">
+    Specify which areas the teacher will teach in which groups.
+    
+    <Warning>
+      The system validates that groups assigned to specific areas match the overall groups assigned to the teacher.
+    </Warning>
+  </Step>
+  
+  <Step title="Optional: Assign as Group Director">
+    If this teacher will be a homeroom teacher, select their director group.
+    
+    <Note>
+      Only one teacher can be assigned as director for each group.
+    </Note>
+  </Step>
+  
+  <Step title="Submit">
+    The system creates the user with a default password (their document number).
+  </Step>
+</Steps>
+
+### Teacher Creation Logic
+
+The `store_user` method (`app/Http/Controllers/CreateController.php:34`) handles teacher creation:
+
+```php
+public function store_user(Request $request)
+{
+    $role = $request->role;
+    $role_name = Role::where('id', $role)->first()->name;
+    
+    if ($role_name == 'docente') {
+        $request->validate([
+            'number_documment' => 'required|digits_between:1,11|unique:users_teachers',
+            'name' => 'required',
+            'last_name' => 'required',
+            'email' => 'required|unique:users_teachers',
+            'areas' => 'required|array',
+            'areas.*' => 'exists:areas,id',
+            'groups' => 'required|array',
+            'groups.*' => 'exists:groups,id',
+            'group_director' => 'nullable|unique:users_teachers',
+            'area_id' => 'required|array',
+            'area_id.*' => 'exists:areas,id',
+            'groups_asig' => 'required|array',
+        ]);
+        
+        // Verify groups in groups_asig match assigned groups
+        foreach ($request->groups_asig as $area_id => $assigned_groups) {
+            foreach ($assigned_groups as $group) {
+                if (!in_array($group, $request->groups)) {
+                    return redirect()->back()->with('error', 
+                        'Groups assigned to areas must match teacher groups.');
+                }
+            }
+        }
+        
+        // Verify no area/group conflict with other teachers
+        foreach ($request->area_id as $area_id) {
+            if (isset($request->groups_asig[$area_id])) {
+                foreach ($request->groups_asig[$area_id] as $groupId) {
+                    $exists = Teachers_areas_group::where('id_area', $area_id)
+                        ->where('id_group', $groupId)
+                        ->exists();
+                    if ($exists) {
+                        $name_area = Area::find($area_id)->name_area;
+                        $name_group = Group::find($groupId)->group;
+                        return redirect()->back()->with('error', 
+                            "Area {$name_area} is already taught in group {$name_group}");
+                    }
+                }
+            }
+        }
+        
+        // Create user
+        $user = new Users_teacher();
+        $user->number_documment = $request->input('number_documment');
+        $user->name = $request->input('name');
+        $user->last_name = $request->input('last_name');
+        $user->email = $request->input('email');
+        $user->group_director = $request->input('group_director');
+        $user->id_state = $state->id;
+        $user->password = bcrypt($request->input('number_documment'));
+        $user->assignRole($role_name);
+        $user->save();
+        
+        // Save area assignments
+        foreach ($request->areas as $area) {
+            DB::table('users_load_areas')->insert([
+                'id_user_teacher' => $user->id,
+                'id_area' => $area,
+            ]);
+        }
+        
+        // Save group assignments
+        foreach ($request->groups as $group) {
+            DB::table('users_load_groups')->insert([
+                'id_user_teacher' => $user->id,
+                'id_group' => $group,
+            ]);
+        }
+        
+        // Save area-group mappings
+        foreach ($request->area_id as $areaId) {
+            if (isset($request->groups_asig[$areaId])) {
+                foreach ($request->groups_asig[$areaId] as $groupId) {
+                    DB::table('teachers_areas_groups')->insert([
+                        'id_teacher' => $user->id,
+                        'id_area' => $areaId,
+                        'id_group' => $groupId,
+                    ]);
+                }
+            }
+        }
+    }
+}
+```
+
+### Creating a Psychologist
+
+<Steps>
+  <Step title="Access User Creation Form">
+    Navigate to `/create/user`.
+  </Step>
+  
+  <Step title="Select Role">
+    Choose "psicoorientador" as the role type.
+  </Step>
+  
+  <Step title="Enter Basic Information">
+    - Document number
+    - First and last name
+    - Email address
+  </Step>
+  
+  <Step title="Assign Grade Levels">
+    Select which grade levels (degrees) this psychologist will be responsible for.
+    
+    <Warning>
+      The system validates that no grade is assigned to multiple psychologists simultaneously.
+    </Warning>
+  </Step>
+  
+  <Step title="Submit">
+    User is created with assigned grade levels.
+  </Step>
+</Steps>
+
+### Psychologist Creation Logic
+
+```php
+if ($role_name == 'psicoorientador') {
+    $request->validate([
+        'number_documment' => 'required|digits_between:1,11|unique:users_teachers',
+        'name' => 'required',
+        'last_name' => 'required',
+        'email' => 'required|unique:users_teachers',
+        'load_degree' => 'required|array',
+        'load_degree.*' => 'exists:degrees,id',
+    ]);
+    
+    // Verify no degree conflicts
+    foreach ($request->load_degree as $degree) {
+        $exists = Users_load_degree::where('id_degree', $degree)->exists();
+        if ($exists) {
+            return redirect()->back()->with('error', 
+                'Some grades are already assigned to another psychologist.');
+        }
+    }
+    
+    // Create user
+    $user = new Users_teacher();
+    $user->number_documment = $request->input('number_documment');
+    $user->name = $request->input('name');
+    $user->last_name = $request->input('last_name');
+    $user->email = $request->input('email');
+    $user->id_state = 1;
+    $user->password = bcrypt($request->input('number_documment'));
+    $user->assignRole($role_name);
+    $user->save();
+    
+    // Save grade assignments
+    foreach ($request->load_degree as $load_degree) {
+        DB::table('users_load_degrees')->insert([
+            'id_user' => $user->id,
+            'id_degree' => $load_degree,
+        ]);
+    }
+}
+```
+
+## Viewing Users
+
+Access the user list at `/listing/users` (`app/Http/Controllers/CreateController.php:303`):
+
+```php
+public function index_users(Request $request)
+{
+    $query = Users_teacher::whereHas('roles', function ($q) {
+        $q->whereIn('name', ['docente', 'psicoorientador']);
+    });
+    
+    // Filter by state
+    if ($request->filled('estado') && $request->estado != 'todos') {
+        $query->whereHas('state', function ($q) use ($request) {
+            $q->where('state', $request->estado);
+        });
+    }
+    
+    // Search functionality
+    if ($request->filled('search')) {
+        $searchTerm = $request->input('search');
+        $query->where(function ($q) use ($searchTerm) {
+            $q->where('name', 'LIKE', "%{$searchTerm}%")
+              ->orWhere('last_name', 'LIKE', "%{$searchTerm}%")
+              ->orWhere('number_documment', 'LIKE', "%{$searchTerm}%")
+              ->orWhereRaw("CONCAT(name, ' ', last_name) LIKE ?", ["%{$searchTerm}%"])
+              ->orWhereHas('areas', function ($q) use ($searchTerm) {
+                  $q->where('name_area', 'LIKE', "%{$searchTerm}%");
+              });
+        });
+    }
+    
+    $users = $query->with([
+                'groups',
+                'areas',
+                'roles',
+                'state',
+                'loadDegrees.degree'
+            ])
+            ->orderBy('name')
+            ->orderBy('last_name')
+            ->paginate(15)
+            ->withQueryString();
+}
+```
+
+### Search and Filter Capabilities
+
+<CardGroup cols={2}>
+  <Card title="Search By" icon="magnifying-glass">
+    - Name or last name
+    - Document number
+    - Full name (combined)
+    - Subject area
+  </Card>
+  
+  <Card title="Filter By" icon="filter">
+    - State (Active/Suspended)
+    - Role (Teacher/Psychologist)
+    - Sort by name
+  </Card>
+</CardGroup>
+
+## Editing Users
+
+### Edit Teacher
+
+Access edit form at `/edit/{id}/user` (`app/Http/Controllers/CreateController.php:353`):
+
+```php
+public function edit_user(string $id)
+{
+    $user = Users_teacher::findOrFail($id);
+    $roles = Role::whereNotIn('name', ['estudiante', 'coordinador'])->get();
+    $areas = Area::orderBy('name_area', 'asc')->get();
+    
+    // Get currently selected areas
+    $selectedAreas = $user->areas->map(function ($area) {
+        return [
+            'id' => $area->id,
+            'name' => $area->name_area
+        ];
+    })->toArray();
+    
+    // Get currently selected groups
+    $groups = Group::orderByRaw('CAST(`group` AS UNSIGNED), `group`')->get();
+    $selectedGroups = $user->groups->pluck('id')->toArray();
+    
+    // Get area-group mappings
+    $groupsForArea = [];
+    foreach ($selectedAreas as $area) {
+        $groupsForThisArea = Teachers_areas_group::where('id_teacher', $user->id)
+            ->where('id_area', $area['id'])
+            ->join('groups', 'teachers_areas_groups.id_group', '=', 'groups.id')
+            ->select('groups.id', 'groups.group')
+            ->get()
+            ->toArray();
+        
+        $groupsForArea[] = [
+            'area_id' => $area['id'],
+            'groups' => $groupsForThisArea
+        ];
+    }
+    
+    return view('academic.userEdit', compact(
+        'user', 'roles', 'areas', 'selectedAreas', 
+        'groups', 'selectedGroups', 'degrees', 
+        'selectedDegrees', 'groupsForArea'
+    ));
+}
+```
+
+### Update Teacher
+
+The update process (`app/Http/Controllers/CreateController.php:393`) includes change detection:
+
+<Steps>
+  <Step title="Validate Input">
+    Validate all fields, ensuring uniqueness constraints are respected (except for current user).
+  </Step>
+  
+  <Step title="Detect Changes">
+    Compare current data with submitted data to determine if updates are needed.
+  </Step>
+  
+  <Step title="Validate Business Rules">
+    - Groups in area assignments must match overall assigned groups
+    - No area/group conflicts with other teachers
+  </Step>
+  
+  <Step title="Update Database">
+    If changes detected:
+    1. Delete existing area and group assignments
+    2. Insert new assignments
+    3. Update user profile
+  </Step>
+  
+  <Step title="Provide Feedback">
+    Inform user if changes were saved or if no changes were detected.
+  </Step>
+</Steps>
+
+```php
+public function update_user(Request $request, string $id)
+{
+    $user = Users_teacher::findOrFail($id);
+    $datos_actuales = $user->toArray();
+    $huboCambios = false;
+    
+    $role_user = $user->roles->first();
+    $role_actual = $role_user ? $role_user->name : null;
+    
+    if ($role_actual == 'docente') {
+        // Validate and compare data
+        // ...
+        
+        if ($huboCambios) {
+            try {
+                DB::transaction(function () use ($id, $areas_nuevas, $grupos_nuevos, $nuevos_datos_TAG) {
+                    // Delete existing assignments
+                    DB::table('users_load_areas')->where('id_user_teacher', $id)->delete();
+                    DB::table('users_load_groups')->where('id_user_teacher', $id)->delete();
+                    DB::table('teachers_areas_groups')->where('id_teacher', $id)->delete();
+                    
+                    // Insert new areas
+                    foreach ($areas_nuevas as $area) {
+                        DB::table('users_load_areas')->insert([
+                            'id_user_teacher' => $id,
+                            'id_area' => $area,
+                        ]);
+                    }
+                    
+                    // Insert new groups
+                    foreach ($grupos_nuevos as $group) {
+                        DB::table('users_load_groups')->insert([
+                            'id_user_teacher' => $id,
+                            'id_group' => $group,
+                        ]);
+                    }
+                    
+                    // Insert new area-group mappings
+                    foreach ($nuevos_datos_TAG as $new_data) {
+                        DB::table('teachers_areas_groups')->insert([
+                            'id_teacher' => $id,
+                            'id_area' => $new_data['id_area'],
+                            'id_group' => $new_data['id_group'],
+                        ]);
+                    };
+                });
+                
+                $user->update($nuevos_datos);
+                
+                return redirect()->back()->with('success', 'User updated successfully.');
+            } catch (\Exception $e) {
+                return redirect()->back()->with('error', 'Error updating user: ' . $e->getMessage());
+            }
+        } else {
+            return redirect()->back()->with('info', 'No changes detected.');
+        }
+    }
+}
+```
+
+## Suspending/Activating Users
+
+The `destroy_user` method (`app/Http/Controllers/CreateController.php:650`) toggles user state:
+
+```php
+public function destroy_user($id)
+{
+    $user = Users_teacher::findOrFail($id);
+    
+    // Toggle state
+    if ($user->id_state == 1) {
+        $user->id_state = 2;  // Suspend
+        $message = 'User suspended successfully';
+    } else {
+        $user->id_state = 1;  // Activate
+        $message = 'User activated successfully';
+    }
+    
+    $user->save();
+    
+    return redirect()->back()->with('success', $message);
+}
+```
+
+<Note>
+  Suspended users cannot log in to the system, but their data and assignments are preserved.
+</Note>
+
+## Model Relationships
+
+The `Users_teacher` model defines complex relationships (`app/Models/Users_teacher.php:38`):
+
+### State Relationship
+
+```php
+public function state()
+{
+    return $this->belongsTo(State::class, 'id_state');
+}
+```
+
+### Academic Relationships
+
+```php
+// Subject areas
+public function areas()
+{
+    return $this->belongsToMany(
+        Area::class,
+        'teachers_areas_groups',
+        'id_teacher',
+        'id_area'
+    )->withPivot('id_group');
+}
+
+// Assigned groups
+public function groups()
+{
+    return $this->belongsToMany(
+        Group::class,
+        'teachers_areas_groups',
+        'id_teacher',
+        'id_group'
+    )->withPivot('id_area');
+}
+
+// Grade assignments (for psychologists)
+public function degrees()
+{
+    return $this->belongsToMany(
+        Degree::class,
+        'users_load_degrees',
+        'id_user',
+        'id_degree'
+    );
+}
+```
+
+## Query Scopes
+
+The model provides reusable query scopes (`app/Models/Users_teacher.php:108`):
+
+```php
+// Active users only
+public function scopeActivos($query)
+{
+    return $query->where('id_state', 1);
+}
+
+// Teachers, psychologists, and coordinators
+public function scopeDocentesPsicoCoordinador($query)
+{
+    return $query->whereHas('roles', function ($q) {
+        $q->whereIn('name', [
+            'docente',
+            'psicoorientador',
+            'coordinador'
+        ]);
+    });
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Unique Assignments" icon="check-double">
+    Ensure no area/group combinations are assigned to multiple teachers.
+  </Card>
+  
+  <Card title="Grade Coverage" icon="graduation-cap">
+    Every grade should have an assigned psychologist for student support.
+  </Card>
+  
+  <Card title="Regular Audits" icon="magnifying-glass-chart">
+    Periodically review user assignments to ensure accuracy.
+  </Card>
+  
+  <Card title="State Management" icon="toggle-on">
+    Use suspension rather than deletion to preserve historical data.
+  </Card>
+  
+  <Card title="Change Detection" icon="code-compare">
+    The system automatically detects changes to avoid unnecessary database operations.
+  </Card>
+  
+  <Card title="Transaction Safety" icon="shield">
+    All multi-table updates use database transactions for data integrity.
+  </Card>
+</CardGroup>
+
+## Related Features
+
+- [Academic Structure](/features/academic-structure)
+- [Student Referrals](/features/student-referrals)
+- [Psycho-Orientation](/features/psycho-orientation)

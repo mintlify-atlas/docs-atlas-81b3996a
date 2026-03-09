@@ -1,0 +1,462 @@
+---
+title: Psycho-Orientation
+description: Comprehensive psychological evaluation and support system for students requiring specialized attention.
+---
+
+## Overview
+
+The Psycho-Orientation module enables psychologists to evaluate referred students, create detailed psychological reports, and recommend appropriate support pathways (PIAR or DUA). This system provides a complete workflow from referral review to intervention planning.
+
+## Psychoorientation Model
+
+The `Psychoorientation` model (`app/Models/Psychoorientation.php:8`) stores psychological evaluation reports:
+
+```php
+protected $fillable = [
+    'psychologist_writes',
+    'id_user_student',
+    'age_student',
+    'group_student',
+    'director_group_student',
+    'title_report',
+    'reason_inquiry',
+    'recomendations',
+    'annex_one', // PDF attachments
+];
+```
+
+### Report Components
+
+<AccordionGroup>
+  <Accordion title="psychologist_writes">
+    Foreign key to `users_teachers` table identifying the psychologist who authored the report.
+  </Accordion>
+  
+  <Accordion title="id_user_student">
+    Foreign key linking to the student being evaluated.
+  </Accordion>
+  
+  <Accordion title="age_student">
+    Student's age at the time of evaluation (important for developmental considerations).
+  </Accordion>
+  
+  <Accordion title="group_student">
+    Student's current class group.
+  </Accordion>
+  
+  <Accordion title="director_group_student">
+    Name of the student's group director/homeroom teacher.
+  </Accordion>
+  
+  <Accordion title="title_report">
+    Descriptive title for the psychological report.
+  </Accordion>
+  
+  <Accordion title="reason_inquiry">
+    Detailed findings and analysis from the psychological inquiry.
+  </Accordion>
+  
+  <Accordion title="recomendations">
+    Professional recommendations for support, intervention, or next steps.
+  </Accordion>
+  
+  <Accordion title="annex_one">
+    Optional PDF attachment for additional documentation (test results, evaluations, etc.).
+  </Accordion>
+</AccordionGroup>
+
+## Psychologist Workflow
+
+### 1. View Assigned Referrals
+
+Psychologists can access referrals based on their assigned grades:
+
+<Steps>
+  <Step title="Access Referral List">
+    Navigate to `/index/students/remitted/psico` to view all active referrals.
+    
+    ```php
+    // Controller: PsicoController.php:114
+    public function index_student_remitted_psico(Request $request)
+    {
+        $id_psico = Auth::id();
+        
+        // Get grades assigned to this psychologist
+        $load_degree = Users_load_degree::where('id_user', $id_psico)
+            ->pluck('id_degree')
+            ->toArray();
+        
+        // Get students with 'activo' state in assigned grades
+        $query = Users_student::whereHas('states', function ($q) {
+                $q->where('state', 'activo');
+            })
+            ->whereIn('id_degree', $load_degree);
+    }
+    ```
+  </Step>
+  
+  <Step title="Filter and Search">
+    Use search functionality to find specific students by name, document number, or full name.
+  </Step>
+  
+  <Step title="Select Student for Review">
+    Click on a student to view detailed referral information.
+  </Step>
+</Steps>
+
+### 2. Review Referral Details
+
+Access complete referral information at `/details/referral/{id}` (`app/Http/Controllers/PsicoController.php:148`):
+
+```php
+public function detailsReferral($id)
+{
+    $info_student = Users_student::findOrFail($id);
+    
+    $info_referral = Referral::where('id_user_student', $id)
+        ->latest()
+        ->first();
+    
+    $report = Psychoorientation::where('id_user_student', $id)
+        ->latest()
+        ->first();
+    
+    return view('psycho.showDetailsReferral', compact(
+        'info_student',
+        'info_referral',
+        'degrees',
+        'groups',
+        'report'
+    ));
+}
+```
+
+The details view includes:
+- Complete student information
+- Teacher's referral reason and observations
+- Strategies already attempted
+- Student's academic placement (degree and group)
+
+### 3. Create Psychological Report
+
+<Steps>
+  <Step title="Access Report Form">
+    From the referral details page, access the report creation form.
+    
+    ```php
+    // Route: routes/web.php:182
+    Route::get('/report/student/{id}', [PsicoController::class, 'report_student'])
+        ->name('report.student');
+    ```
+  </Step>
+  
+  <Step title="Update Student Information">
+    Verify and update student details if needed:
+    - Document number
+    - Name and surname
+    - Age
+    - Degree and group
+    - State (can be changed to 'en PIAR' or remain 'Activo')
+  </Step>
+  
+  <Step title="Write Report">
+    Complete the psychological evaluation:
+    - **Title**: Descriptive title for the report
+    - **Reason for Inquiry**: Detailed findings and analysis
+    - **Recommendations**: Professional recommendations and next steps
+  </Step>
+  
+  <Step title="Attach Documentation">
+    Upload supporting documentation (PDF, max 5MB) if available.
+  </Step>
+  
+  <Step title="Submit Report">
+    Save the report, which updates the student's state and creates a permanent record.
+  </Step>
+</Steps>
+
+### Report Storage
+
+The `store_report_student` method (`app/Http/Controllers/PsicoController.php:230`) handles report creation:
+
+```php
+public function store_report_student(Request $request, string $id)
+{
+    $request->validate([
+        'number_documment' => 'required|digits_between:1,20|unique:users_students,number_documment,' . $id,
+        'name' => 'required|string',
+        'last_name' => 'required|string',
+        'degree' => 'required|exists:degrees,id',
+        'group' => 'required|exists:groups,id',
+        'age' => 'required|integer',
+        'state' => 'required|exists:states,id',
+        'title_report' => 'required|string',
+        'reason_inquiry' => 'required|string',
+        'recomendations' => 'required|string',
+        'annex_one' => 'nullable|mimes:pdf|max:5120',
+    ]);
+    
+    DB::beginTransaction();
+    
+    try {
+        // Update student information
+        $student = Users_student::findOrFail($id);
+        $student->update([
+            'number_documment' => $request->number_documment,
+            'name' => $request->name,
+            'last_name' => $request->last_name,
+            'id_degree' => $request->degree,
+            'id_group' => $request->group,
+            'age' => $request->age,
+            'id_state' => $request->state,
+        ]);
+        
+        // Get group director information
+        $group = Group::findOrFail($request->group);
+        $director = Users_teacher::where('group_director', $request->group)->first();
+        
+        // Handle file upload
+        $annexPath = null;
+        if ($request->hasFile('annex_one')) {
+            $file = $request->file('annex_one');
+            $fileName = 'student_' . $id . '_' . now()->format('Ymd_His') . '.pdf';
+            $annexPath = $file->storeAs(
+                'annexes/student_' . $id,
+                $fileName,
+                'public'
+            );
+        }
+        
+        // Create psychoorientation report
+        Psychoorientation::create([
+            'psychologist_writes' => Auth::id(),
+            'id_user_student' => $id,
+            'age_student' => $request->age,
+            'group_student' => $group->group,
+            'director_group_student' => $director
+                ? $director->name . ' ' . $director->last_name
+                : 'No asignado',
+            'title_report' => $request->title_report,
+            'reason_inquiry' => $request->reason_inquiry,
+            'recomendations' => $request->recomendations,
+            'annex_one' => $annexPath,
+        ]);
+        
+        DB::commit();
+        
+        return redirect()
+            ->route('index.student.remitted.psico')
+            ->with('success', 'Informe guardado correctamente.');
+            
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->with('error', $e->getMessage());
+    }
+}
+```
+
+<Note>
+  File uploads are stored in organized directories: `storage/annexes/student_{id}/` with timestamped filenames for version control.
+</Note>
+
+## Student State Management
+
+Psychologists can update student states during report creation:
+
+<CardGroup cols={3}>
+  <Card title="Activo" icon="circle-check">
+    Student under review, no specialized program required yet.
+  </Card>
+  
+  <Card title="en PIAR" icon="file-pen">
+    Student requires an Individualized Plan of Reasonable Adjustments (PIAR).
+  </Card>
+  
+  <Card title="en DUA" icon="universal-access">
+    Student requires Universal Design for Learning (DUA) accommodations.
+  </Card>
+</CardGroup>
+
+## Viewing Students by State
+
+The system provides filtered views for different student states:
+
+### Active Students
+
+```php
+// Route: /psico/students/active
+public function index_students_active_psico(Request $request)
+{
+    // Shows ALL students assigned to psychologist, regardless of state
+}
+```
+
+### PIAR Students
+
+```php
+// Route: /psico/students/piar
+public function index_students_piar_psico(Request $request)
+{
+    return $this->studentsByState($request, 'en PIAR', 'En PIAR', 'psico.students.piar');
+}
+```
+
+### DUA Students
+
+```php
+// Route: /psico/students/dua
+public function index_students_dua_psico(Request $request)
+{
+    return $this->studentsByState($request, 'en DUA', 'En DUA', 'psico.students.dua');
+}
+```
+
+## Student History
+
+Access complete student history at `/student/history/{id}` (`app/Http/Controllers/PsicoController.php:316`):
+
+```php
+public function show_student_history(string $id)
+{
+    $student = Users_student::findOrFail($id);
+    
+    $referrals = Referral::where('id_user_student', $id)
+        ->orderBy('created_at', 'desc')
+        ->paginate(10);
+    
+    $reports = Psychoorientation::where('id_user_student', $id)
+        ->orderBy('created_at', 'desc')
+        ->paginate(10);
+    
+    return view('psycho.studentHistory', compact(
+        'student',
+        'referrals',
+        'reports'
+    ));
+}
+```
+
+This view provides:
+- All historical referrals for the student
+- All psychological reports
+- Chronological timeline of interventions
+- Access to view and download attachments
+
+## Editing Reports
+
+Psychologists can update existing reports at `/history/details/report/{id}` (`app/Http/Controllers/PsicoController.php:402`):
+
+<Steps>
+  <Step title="Access Report">
+    Navigate to the student's history and select a report to edit.
+  </Step>
+  
+  <Step title="Modify Content">
+    Update:
+    - Report title
+    - Reason for inquiry
+    - Recommendations
+  </Step>
+  
+  <Step title="Update Attachments">
+    Replace or remove PDF attachments as needed.
+  </Step>
+  
+  <Step title="Save Changes">
+    Changes are saved with automatic file management.
+  </Step>
+</Steps>
+
+### File Management
+
+```php
+public function update_history_details_report(Request $request, string $id)
+{
+    // If new file uploaded
+    if ($request->hasFile('annex_one')) {
+        // Delete old file
+        if ($report->annex_one && Storage::disk('public')->exists($report->annex_one)) {
+            Storage::disk('public')->delete($report->annex_one);
+        }
+        
+        // Store new file
+        $file = $request->file('annex_one');
+        $fileName = 'student_' . $report->id_user_student . '_' . now()->format('Ymd_His') . '.pdf';
+        $annexPath = $file->storeAs(
+            'annexes/student_' . $report->id_user_student,
+            $fileName,
+            'public'
+        );
+        
+        $report->annex_one = $annexPath;
+    }
+    
+    $report->save();
+}
+```
+
+## Relationships
+
+The Psychoorientation model defines two key relationships (`app/Models/Psychoorientation.php:30`):
+
+```php
+// Relationship with psychologist
+public function user_psychology()
+{
+    return $this->belongsTo(Users_teacher::class, 'psychologist_writes');
+}
+
+// Relationship with student
+public function user_student()
+{
+    return $this->belongsTo(Users_student::class, 'id_user_student');
+}
+```
+
+## Grade Assignment System
+
+Psychologists are assigned to specific grades through the `users_load_degrees` table:
+
+```php
+$load_degree = Users_load_degree::where('id_user', $id_psico)
+    ->pluck('id_degree')
+    ->toArray();
+```
+
+<Warning>
+  Psychologists can only view and manage students in their assigned grades. This ensures appropriate workload distribution and specialization.
+</Warning>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Comprehensive Assessment" icon="clipboard-list">
+    Conduct thorough evaluations using multiple data sources and assessment tools.
+  </Card>
+  
+  <Card title="Timely Response" icon="clock">
+    Review referrals promptly to ensure students receive timely support.
+  </Card>
+  
+  <Card title="Clear Documentation" icon="file-lines">
+    Write detailed, professional reports that clearly communicate findings and recommendations.
+  </Card>
+  
+  <Card title="Collaborative Approach" icon="users">
+    Work closely with teachers, administrators, and families for comprehensive support.
+  </Card>
+  
+  <Card title="Confidentiality" icon="shield">
+    Maintain strict confidentiality of all psychological evaluations and reports.
+  </Card>
+  
+  <Card title="Regular Follow-up" icon="calendar-check">
+    Monitor student progress and update reports as needed.
+  </Card>
+</CardGroup>
+
+## Related Features
+
+- [Student Referrals](/features/student-referrals)
+- [PIAR and DUA Management](/features/piar-dua-management)
+- [User Management](/features/user-management)

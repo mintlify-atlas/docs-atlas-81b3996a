@@ -1,0 +1,325 @@
+---
+title: "Referral Model"
+description: "Student referral records documenting behavioral observations and interventions"
+---
+
+## Overview
+
+The `Referral` model represents referral records created by teachers when students need additional support or intervention. It documents the reason for referral, observations, strategies applied, and includes optional attachments.
+
+**Namespace:** `App\Models\Referral`
+
+**Extends:** `Illuminate\Database\Eloquent\Model`
+
+**Traits:**
+- `HasFactory` - Enables model factories for testing
+
+## Model Definition
+
+```php
+class Referral extends Model
+{
+    use HasFactory;
+}
+```
+
+## Fillable Fields
+
+These fields can be mass-assigned when creating or updating referral records.
+
+<ParamField body="id_user_student" type="integer" required>
+  Foreign key to the Users_student model - the student being referred
+</ParamField>
+
+<ParamField body="id_user_teacher" type="integer" required>
+  Foreign key to the Users_teacher model - the teacher creating the referral
+</ParamField>
+
+<ParamField body="reason" type="text" required>
+  The primary reason for the referral (behavioral, academic, social, etc.)
+</ParamField>
+
+<ParamField body="observation" type="text">
+  Detailed observations about the student's behavior or situation
+</ParamField>
+
+<ParamField body="strategies" type="text">
+  Intervention strategies that have been attempted or recommended
+</ParamField>
+
+<ParamField body="annex_one" type="string">
+  File path or reference to an attached document (evidence, reports, etc.)
+</ParamField>
+
+<ParamField body="course" type="string">
+  Course or subject context where the issue was observed
+</ParamField>
+
+## Relationships
+
+### BelongsTo Relationships
+
+<Expandable title="user_student()">
+  Returns the student who is being referred.
+
+  ```php
+  public function user_student()
+  {
+      return $this->belongsTo(Users_student::class, 'id_user_student');
+  }
+  ```
+
+  **Foreign Key:** `id_user_student`
+  
+  **Related Model:** [Users_student](/api/models/student)
+
+  **Usage:**
+  ```php
+  $referral = Referral::find(1);
+  $student = $referral->user_student;
+  
+  echo "Student: {$student->name} {$student->last_name}";
+  echo "Age: {$student->age}";
+  echo "Group: {$student->group->name}";
+  ```
+</Expandable>
+
+<Expandable title="user_teacher()">
+  Returns the teacher who created the referral.
+
+  ```php
+  public function user_teacher()
+  {
+      return $this->belongsTo(Users_teacher::class, 'id_user_teacher');
+  }
+  ```
+
+  **Foreign Key:** `id_user_teacher`
+  
+  **Related Model:** [Users_teacher](/api/models/teacher)
+
+  **Usage:**
+  ```php
+  $referral = Referral::find(1);
+  $teacher = $referral->user_teacher;
+  
+  echo "Referred by: {$teacher->name} {$teacher->lastname}";
+  echo "Email: {$teacher->email}";
+  ```
+</Expandable>
+
+## Usage Examples
+
+### Creating a Referral
+
+```php
+use App\Models\Referral;
+
+$referral = Referral::create([
+    'id_user_student' => 15,
+    'id_user_teacher' => 8,
+    'reason' => 'Dificultades de concentración en clase',
+    'observation' => 'El estudiante presenta distracción constante durante las explicaciones y no completa las actividades asignadas.',
+    'strategies' => 'Se ha intentado ubicar al estudiante en la primera fila y proporcionar instrucciones individuales.',
+    'annex_one' => 'uploads/referrals/evidence_2024_03_15.pdf',
+    'course' => 'Matemáticas',
+]);
+```
+
+### Querying Referrals
+
+```php
+// Get all referrals with student and teacher information
+$referrals = Referral::with(['user_student', 'user_teacher'])->get();
+
+foreach ($referrals as $referral) {
+    echo "Student: {$referral->user_student->name}";
+    echo "Teacher: {$referral->user_teacher->name}";
+    echo "Reason: {$referral->reason}";
+    echo "Date: {$referral->created_at->format('Y-m-d')}";
+    echo "---";
+}
+```
+
+### Finding Referrals by Student
+
+```php
+use App\Models\Users_student;
+
+// Get all referrals for a specific student
+$student = Users_student::find(15);
+$referrals = $student->referrals()->orderBy('created_at', 'desc')->get();
+
+echo "Total referrals: " . $referrals->count();
+
+// Get the most recent referral
+$latestReferral = $student->latestReferral;
+if ($latestReferral) {
+    echo "Latest referral reason: {$latestReferral->reason}";
+    echo "Date: {$latestReferral->created_at->format('Y-m-d')}";
+}
+```
+
+### Finding Referrals by Teacher
+
+```php
+use App\Models\Users_teacher;
+
+// Get all referrals created by a specific teacher
+$teacher = Users_teacher::find(8);
+$referrals = Referral::where('id_user_teacher', $teacher->id)
+    ->with('user_student')
+    ->orderBy('created_at', 'desc')
+    ->get();
+
+foreach ($referrals as $referral) {
+    echo "Student: {$referral->user_student->name}";
+    echo "Course: {$referral->course}";
+    echo "Reason: {$referral->reason}";
+}
+```
+
+### Filtering by Date Range
+
+```php
+use Carbon\Carbon;
+
+// Get referrals from the last 30 days
+$recentReferrals = Referral::where('created_at', '>=', Carbon::now()->subDays(30))
+    ->with(['user_student', 'user_teacher'])
+    ->get();
+
+// Get referrals for current academic year
+$yearStart = Carbon::parse('2024-01-01');
+$yearEnd = Carbon::parse('2024-12-31');
+
+$yearReferrals = Referral::whereBetween('created_at', [$yearStart, $yearEnd])
+    ->get();
+```
+
+### Updating a Referral
+
+```php
+$referral = Referral::find(1);
+
+$referral->update([
+    'strategies' => 'Se implementó un sistema de refuerzo positivo y seguimiento diario. Se programó reunión con padres.',
+    'observation' => $referral->observation . ' Actualización: Se observa mejora gradual en la semana 2.',
+]);
+```
+
+### Searching Referrals
+
+```php
+// Search by reason or observation
+$keyword = 'concentración';
+
+$searchResults = Referral::where('reason', 'like', "%{$keyword}%")
+    ->orWhere('observation', 'like', "%{$keyword}%")
+    ->orWhere('strategies', 'like', "%{$keyword}%")
+    ->with(['user_student', 'user_teacher'])
+    ->get();
+```
+
+### Referrals by Course
+
+```php
+// Get all referrals for a specific course
+$mathReferrals = Referral::where('course', 'Matemáticas')
+    ->with('user_student')
+    ->get();
+
+// Count referrals per course
+$referralsByCourse = Referral::selectRaw('course, COUNT(*) as total')
+    ->groupBy('course')
+    ->orderBy('total', 'desc')
+    ->get();
+
+foreach ($referralsByCourse as $stat) {
+    echo "{$stat->course}: {$stat->total} referrals";
+}
+```
+
+### Working with Attachments
+
+```php
+$referral = Referral::find(1);
+
+// Check if referral has an attachment
+if ($referral->annex_one) {
+    $filePath = storage_path('app/public/' . $referral->annex_one);
+    
+    if (file_exists($filePath)) {
+        // Process or download the file
+        echo "Attachment: {$referral->annex_one}";
+    }
+}
+
+// Add attachment to existing referral
+$referral->update([
+    'annex_one' => 'uploads/referrals/additional_evidence_2024_03_20.pdf'
+]);
+```
+
+### Statistics and Reports
+
+```php
+// Get referral count per student
+$studentReferralCounts = Referral::selectRaw('id_user_student, COUNT(*) as total')
+    ->groupBy('id_user_student')
+    ->having('total', '>', 3) // Students with more than 3 referrals
+    ->with('user_student')
+    ->get();
+
+// Get most active referring teachers
+$teacherReferralCounts = Referral::selectRaw('id_user_teacher, COUNT(*) as total')
+    ->groupBy('id_user_teacher')
+    ->orderBy('total', 'desc')
+    ->with('user_teacher')
+    ->take(10)
+    ->get();
+```
+
+## Common Queries
+
+### Get All Referrals with Full Context
+
+```php
+$referrals = Referral::with([
+    'user_student.group',
+    'user_student.degree',
+    'user_teacher'
+])
+->orderBy('created_at', 'desc')
+->paginate(20);
+```
+
+### Students with Multiple Referrals
+
+```php
+use App\Models\Users_student;
+
+$studentsWithMultipleReferrals = Users_student::has('referrals', '>=', 2)
+    ->withCount('referrals')
+    ->with('latestReferral')
+    ->get();
+```
+
+### Referrals Pending Follow-up
+
+```php
+// Assuming you track follow-up status separately
+// or use timestamps to identify recent referrals
+$pendingReferrals = Referral::whereDoesntHave('user_student.psychoorientations', function ($query) {
+    $query->where('created_at', '>', now()->subDays(7));
+})
+->where('created_at', '>', now()->subDays(30))
+->with(['user_student', 'user_teacher'])
+->get();
+```
+
+## Source Code Reference
+
+View the complete model implementation:
+
+**File:** `/home/daytona/workspace/source/app/Models/Referral.php:8-33`

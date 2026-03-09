@@ -1,0 +1,444 @@
+---
+title: Coordinator Routes
+description: Protected routes for coordinator role user management, group administration, degree management, and area configuration
+---
+
+## Overview
+
+Coordinator routes are restricted to users with the `coordinador` role. These routes manage users, groups, degrees, and subject areas within the system.
+
+<Warning>
+  All coordinator routes require:
+  - `PreventBackHistoryMiddleware` - Prevents browser back button caching
+  - `auth` - User must be authenticated
+  - `RoleMiddleware` - User must have `coordinador` role
+</Warning>
+
+## User Management
+
+### GET /create/user
+
+Displays the form to create a new user.
+
+<ParamField path="/create/user" type="GET">
+  Shows the user creation form with role selection and profile fields.
+</ParamField>
+
+**Controller**: `CreateController@create_user`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RoleMiddleware`
+
+**Named Route**: `create.user`
+
+**Required Role**: `coordinador`
+
+**Source**: web.php:93
+
+---
+
+### POST /store/user
+
+Creates a new user in the system.
+
+<ParamField path="/store/user" type="POST">
+  Processes user creation and stores the new user record.
+</ParamField>
+
+**Controller**: `CreateController@store_user`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RoleMiddleware`
+
+**Named Route**: `store.user`
+
+**Required Role**: `coordinador`
+
+**Request Parameters**:
+- User details (name, email, role, etc.)
+
+**Source**: web.php:94
+
+---
+
+### GET /listing/users
+
+Displays a list of all users in the system.
+
+<ParamField path="/listing/users" type="GET">
+  Shows a paginated table of all registered users with search and filter options.
+</ParamField>
+
+**Controller**: `CreateController@index_users`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RoleMiddleware`
+
+**Named Route**: `index.users`
+
+**Required Role**: `coordinador`
+
+**Source**: web.php:95
+
+---
+
+### GET /edit/{id}/user
+
+Displays the form to edit an existing user.
+
+<ParamField path="/edit/{id}/user" type="GET">
+  Shows the user editing form populated with current user data.
+</ParamField>
+
+**Controller**: `CreateController@edit_user`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RoleMiddleware`
+
+**Named Route**: `edit.user`
+
+**Required Role**: `coordinador`
+
+**URL Parameters**:
+- `id` (integer, required) - The user ID to edit
+
+**Source**: web.php:96
+
+---
+
+### PUT /update/user/{id}
+
+Updates an existing user's information.
+
+<ParamField path="/update/user/{id}" type="PUT">
+  Processes user update and saves changes to the database.
+</ParamField>
+
+**Controller**: `CreateController@update_user`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RoleMiddleware`
+
+**Named Route**: `update.user`
+
+**Required Role**: `coordinador`
+
+**URL Parameters**:
+- `id` (integer, required) - The user ID to update
+
+**Request Parameters**:
+- Updated user details
+
+**Source**: web.php:97
+
+---
+
+### PUT /delete/user/{id}
+
+Soft deletes a user from the system.
+
+<ParamField path="/delete/user/{id}" type="PUT">
+  Marks a user as deleted (soft delete).
+</ParamField>
+
+**Controller**: `CreateController@destroy_user`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RoleMiddleware`
+
+**Named Route**: `destroy.user`
+
+**Required Role**: `coordinador`
+
+**URL Parameters**:
+- `id` (integer, required) - The user ID to delete
+
+<Note>
+  This is a soft delete operation using PUT method, not a hard delete.
+</Note>
+
+**Source**: web.php:98
+
+---
+
+## Group Management
+
+### GET /create/group
+
+Displays the form to create a new student group.
+
+<ParamField path="/create/group" type="GET">
+  Shows the group creation form.
+</ParamField>
+
+**Controller**: `CreateGroupController@create_group`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RoleMiddleware`
+
+**Named Route**: `create.group`
+
+**Required Role**: `coordinador`
+
+**Source**: web.php:100
+
+---
+
+### POST /store/group
+
+Creates a new student group.
+
+<ParamField path="/store/group" type="POST">
+  Processes group creation and stores the new group record.
+</ParamField>
+
+**Controller**: `CreateGroupController@store_group`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RoleMiddleware`
+
+**Named Route**: `store.group`
+
+**Required Role**: `coordinador`
+
+**Request Parameters**:
+- Group details (name, grade, etc.)
+
+**Source**: web.php:101
+
+---
+
+### PUT /update/group
+
+Updates an existing student group.
+
+<ParamField path="/update/group" type="PUT">
+  Processes group update and saves changes.
+</ParamField>
+
+**Controller**: `CreateGroupController@update_group`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RoleMiddleware`
+
+**Named Route**: `update.group`
+
+**Required Role**: `coordinador`
+
+**Request Parameters**:
+- Updated group details
+
+**Source**: web.php:102
+
+---
+
+### DELETE /delete/group/{id}
+
+Deletes a student group.
+
+<ParamField path="/delete/group/{id}" type="DELETE">
+  Removes a group from the system.
+</ParamField>
+
+**Controller**: `CreateGroupController@destroy_group`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RoleMiddleware`
+
+**Named Route**: `destroy.group`
+
+**Required Role**: `coordinador`
+
+**URL Parameters**:
+- `id` (integer, required) - The group ID to delete
+
+**Source**: web.php:103
+
+---
+
+## Degree Management
+
+### GET /create/degree
+
+Displays the form to create a new academic degree.
+
+<ParamField path="/create/degree" type="GET">
+  Shows the degree creation form.
+</ParamField>
+
+**Controller**: `CreateDegreeController@create_degree`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RoleMiddleware`
+
+**Named Route**: `create.degree`
+
+**Required Role**: `coordinador`
+
+**Source**: web.php:105
+
+---
+
+### POST /store/degree
+
+Creates a new academic degree.
+
+<ParamField path="/store/degree" type="POST">
+  Processes degree creation and stores the new degree record.
+</ParamField>
+
+**Controller**: `CreateDegreeController@store_degree`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RoleMiddleware`
+
+**Named Route**: `store.degree`
+
+**Required Role**: `coordinador`
+
+**Request Parameters**:
+- Degree details (name, level, etc.)
+
+**Source**: web.php:106
+
+---
+
+### PUT /update/degree
+
+Updates an existing academic degree.
+
+<ParamField path="/update/degree" type="PUT">
+  Processes degree update and saves changes.
+</ParamField>
+
+**Controller**: `CreateDegreeController@update_degree`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RoleMiddleware`
+
+**Named Route**: `update.degree`
+
+**Required Role**: `coordinador`
+
+**Request Parameters**:
+- Updated degree details
+
+**Source**: web.php:107
+
+---
+
+### DELETE /delete/degree/{id}
+
+Deletes an academic degree.
+
+<ParamField path="/delete/degree/{id}" type="DELETE">
+  Removes a degree from the system.
+</ParamField>
+
+**Controller**: `CreateDegreeController@destroy_degree`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RoleMiddleware`
+
+**Named Route**: `delete.degree`
+
+**Required Role**: `coordinador`
+
+**URL Parameters**:
+- `id` (integer, required) - The degree ID to delete
+
+**Source**: web.php:108
+
+---
+
+## Area Management
+
+### GET /create/area
+
+Displays the form to create a new subject area.
+
+<ParamField path="/create/area" type="GET">
+  Shows the subject area creation form.
+</ParamField>
+
+**Controller**: `CreateAreaController@create_area`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RoleMiddleware`
+
+**Named Route**: `create.area`
+
+**Required Role**: `coordinador`
+
+**Source**: web.php:110
+
+---
+
+### POST /store/area
+
+Creates a new subject area.
+
+<ParamField path="/store/area" type="POST">
+  Processes subject area creation and stores the new record.
+</ParamField>
+
+**Controller**: `CreateAreaController@store_area`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RoleMiddleware`
+
+**Named Route**: `store.area`
+
+**Required Role**: `coordinador`
+
+**Request Parameters**:
+- Area details (name, description, etc.)
+
+**Source**: web.php:111
+
+---
+
+### PUT /update/area
+
+Updates an existing subject area.
+
+<ParamField path="/update/area" type="PUT">
+  Processes subject area update and saves changes.
+</ParamField>
+
+**Controller**: `CreateAreaController@update_area`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RoleMiddleware`
+
+**Named Route**: `update.area`
+
+**Required Role**: `coordinador`
+
+**Request Parameters**:
+- Updated area details
+
+**Source**: web.php:112
+
+---
+
+### DELETE /delete/area/{id}
+
+Deletes a subject area.
+
+<ParamField path="/delete/area/{id}" type="DELETE">
+  Removes a subject area from the system.
+</ParamField>
+
+**Controller**: `CreateAreaController@destroy_area`
+
+**Middleware**: `PreventBackHistoryMiddleware`, `auth`, `RoleMiddleware`
+
+**Named Route**: `delete.area`
+
+**Required Role**: `coordinador`
+
+**URL Parameters**:
+- `id` (integer, required) - The area ID to delete
+
+**Source**: web.php:113
+
+---
+
+## Middleware Reference
+
+### RoleMiddleware
+
+Restricts access to users with the `coordinador` role only.
+
+**Behavior**:
+- Checks if user is authenticated
+- Verifies user has `coordinador` role
+- Returns 403 Forbidden if role check fails
+
+**Error Message**: "No tienes permiso para acceder a esta página."
+
+**Source**: RoleMiddleware.php:12-20

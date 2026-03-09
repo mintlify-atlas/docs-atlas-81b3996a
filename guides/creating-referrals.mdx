@@ -1,0 +1,213 @@
+---
+title: "Creating Student Referrals"
+description: "Step-by-step guide for teachers to create and submit student referrals to psychologists"
+---
+
+## Overview
+
+Student referrals are the primary mechanism for teachers to request psychological support for students who need additional attention. This guide walks through the complete referral creation process.
+
+## Prerequisites
+
+Before creating a referral, ensure:
+
+- You are logged in with a **Teacher** (`docente`) or **Psychologist** (`psicoorientador`) account
+- You have identified a student requiring support
+- You have documented observations and attempted strategies
+
+<Note>
+Both teachers and psychologists can create referrals, but only psychologists assigned to the student's grade level can process them.
+</Note>
+
+## Referral Creation Workflow
+
+<Steps>
+  <Step title="Access the Referral Form">
+    Navigate to `/create/referral` in the application. The form displays all available groups and degrees.
+
+    ```php CreateReferralController.php:22-29
+    public function create_referral()
+    {
+        $groups = Group::orderByRaw('CAST(`group` AS UNSIGNED), `group`')->get();
+        $degrees = Degree::orderByRaw('CAST(`degree` AS UNSIGNED), `degree`')->get();
+
+        return view('teacher.studentReferral', compact('groups', 'degrees'));
+    }
+    ```
+  </Step>
+
+  <Step title="Complete Student Information">
+    Fill in the required student details:
+
+    <ParamField path="number_documment" type="string" required>
+      Student's ID number (1-20 digits)
+    </ParamField>
+
+    <ParamField path="name" type="string" required>
+      Student's first name
+    </ParamField>
+
+    <ParamField path="last_name" type="string" required>
+      Student's last name
+    </ParamField>
+
+    <ParamField path="degree" type="integer" required>
+      Academic grade level
+    </ParamField>
+
+    <ParamField path="group" type="integer" required>
+      Class section/group
+    </ParamField>
+
+    <ParamField path="age" type="integer">
+      Student's age (optional)
+    </ParamField>
+  </Step>
+
+  <Step title="Document the Referral Reason">
+    <ParamField path="reason_referral" type="string" required>
+      Primary reason for referring the student (e.g., behavioral concerns, learning difficulties, emotional support needs)
+    </ParamField>
+
+    <ParamField path="observation" type="string" required>
+      Detailed observations of the student's behavior, academic performance, or specific incidents
+    </ParamField>
+
+    <ParamField path="strategies" type="string" required>
+      Interventions and strategies already attempted by the teacher
+    </ParamField>
+  </Step>
+
+  <Step title="Submit the Referral">
+    Click submit to create the referral. The system will:
+
+    1. Validate all required fields
+    2. Check if the student already exists in the system
+    3. Verify the student's current status
+    4. Assign the referral to the appropriate psychologist
+    5. Send email notifications
+  </Step>
+</Steps>
+
+## Backend Processing
+
+When you submit a referral, the `store_referral()` method performs these operations:
+
+```php CreateReferralController.php:32-47
+public function store_referral(Request $request)
+{
+    $id_teacher = Auth::id();
+    $state = State::where('state', 'activo')->firstOrFail();
+
+    $request->validate([
+        'number_documment' => 'required|digits_between:1,20',
+        'name' => 'required',
+        'last_name' => 'required',
+        'degree' => 'required',
+        'group' => 'required',
+        'age' => 'nullable|integer|min:0',
+        'reason_referral' => 'required|string',
+        'observation' => 'required|string',
+        'strategies' => 'required|string',
+    ]);
+    // ... continued processing
+}
+```
+
+### Student Status Validation
+
+The system checks if the student exists and their current state:
+
+<Accordion title="Student Already Active">
+  If the student has an **active** referral, you'll receive:
+  > "El estudiante ya fue remitido y está en revisión por el psicoorientador."
+</Accordion>
+
+<Accordion title="Student in PIAR Program">
+  If the student is already in the **PIAR** program:
+  > "El estudiante ya está en proceso PIAR."
+</Accordion>
+
+<Accordion title="Student in DUA Program">
+  If the student is already in the **DUA** program:
+  > "El estudiante ya está en proceso DUA."
+</Accordion>
+
+### Psychologist Assignment
+
+The system automatically assigns the referral to a psychologist based on the student's grade:
+
+```php CreateReferralController.php:52-59
+$degreeLoad = Users_load_degree::where('id_degree', $request->input('degree'))->first();
+
+if (!$degreeLoad) {
+    return redirect()->back()->with('error', 
+        'No se encontró un psicoorientador asignado para el grado seleccionado...');
+}
+
+$id_psico = $degreeLoad->id_user;
+```
+
+<Warning>
+If no psychologist is assigned to the selected grade, the referral cannot be created. Contact the coordinator to assign a psychologist to that grade.
+</Warning>
+
+## Email Notifications
+
+Upon successful referral creation, the system sends email notifications using the `CreatedReferralMail` mailable:
+
+```php CreateReferralController.php
+Mail::to($psico_date->email)
+    ->send(new CreatedReferralMail($user, $referral, $psico_date));
+```
+
+The psychologist receives:
+- Student information
+- Referral reason and observations
+- Attempted strategies
+- Link to review the referral
+
+## After Submission
+
+Once created:
+
+1. The student is saved with state **"activo"** (active)
+2. The referral record is linked to the student
+3. The assigned psychologist can view it at `/index/students/remitted/psico`
+4. You can track the referral at `/index/students/remitted`
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="No psychologist assigned to grade">
+    Contact your coordinator to assign a psychologist to the student's grade level using the system's user management features.
+  </Accordion>
+
+  <Accordion title="Student already referred">
+    Check the student's current status. If they're already active, in PIAR, or in DUA, you cannot create a new referral until their current case is closed.
+  </Accordion>
+
+  <Accordion title="Email not received">
+    Verify that:
+    - The psychologist's email is correct in their profile
+    - Mail configuration is properly set up in `.env`
+    - SMTP credentials are valid
+  </Accordion>
+</AccordionGroup>
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card title="Managing Students" icon="users" href="/guides/managing-students">
+    Update student information and track their progress
+  </Card>
+  <Card title="Student Referrals Feature" icon="hand-holding-heart" href="/features/student-referrals">
+    Learn more about the referral system architecture
+  </Card>
+  <Card title="Teacher Role" icon="chalkboard-user" href="/roles/teacher">
+    Full capabilities of the teacher role
+  </Card>
+  <Card title="Psychologist Role" icon="user-doctor" href="/roles/psychologist">
+    How psychologists process referrals
+  </Card>
+</CardGroup>
