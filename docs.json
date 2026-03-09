@@ -80,9 +80,11 @@
           {
             "group": "Controllers",
             "pages": [
+              "api/controllers/auth-controller",
               "api/controllers/referral-controller",
               "api/controllers/psico-controller",
-              "api/controllers/create-controller"
+              "api/controllers/create-controller",
+              "api/controllers/profile-controller"
             ]
           },
           {

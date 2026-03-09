@@ -1,0 +1,295 @@
+---
+title: "ProfileController"
+description: "User profile management controller for viewing and updating account information"
+---
+
+## Overview
+
+The `ProfileController` handles user profile operations including viewing profile information, updating email addresses, and managing profile photos. All methods require authentication and are accessible to all user roles.
+
+**Location:** `~/workspace/source/app/Http/Controllers/ProfileController.php`
+
+## Methods
+
+### index()
+
+Display the user's profile page with their information, roles, and assignments.
+
+**Route:** `GET /mi-perfil`
+
+**Authorization:** Authenticated users (all roles)
+
+**Returns:** Profile view with user data
+
+```php ProfileController.php:13-38
+public function index()
+{
+    $user = Auth::user();
+
+    // Roles del usuario
+    $roles = $user->roles->pluck('name')->toArray();
+
+    // Grados asignados (psicoorientador)
+    $degrees = Users_load_degree::where('id_user', $user->id)
+        ->with('degree')
+        ->get()
+        ->pluck('degree.degree');
+
+    // Grupo donde es director (si aplica)
+    $directorGroup = Users_teacher::where('id', $user->id)
+        ->whereNotNull('group_director')
+        ->with('director')
+        ->first();
+
+    return view('profile.index', compact(
+        'user',
+        'roles',
+        'degrees',
+        'directorGroup'
+    ));
+}
+```
+
+**Data Returned:**
+- `user`: Authenticated user model
+- `roles`: Array of role names (coordinador, docente, psicoorientador)
+- `degrees`: Grade levels assigned to psychologist (if applicable)
+- `directorGroup`: Group where user is director (if applicable)
+
+<Note>
+This method automatically displays different information based on the user's role. Psychologists see their assigned grades, and group directors see their assigned group.
+</Note>
+
+---
+
+### updateEmail()
+
+Update the user's email address with password verification.
+
+**Route:** `PUT /mi-perfil/email`
+
+**Authorization:** Authenticated users (all roles)
+
+**Request Parameters:**
+
+<ParamField path="email" type="string" required>
+  New email address (must be unique)
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  Current password for verification
+</ParamField>
+
+**Validation Rules:**
+
+```php ProfileController.php:43-51
+$request->validate([
+    'email' => [
+        'required',
+        'email',
+        'max:255',
+        'unique:users_teachers,email,' . Auth::id(),
+    ],
+    'password' => ['required'],
+]);
+```
+
+**Logic:**
+
+```php ProfileController.php:53-64
+$user = Auth::user();
+
+if (!Hash::check($request->password, $user->password)) {
+    return back()->withErrors([
+        'password' => 'La contraseña es incorrecta.',
+    ]);
+}
+
+$user->email = $request->email;
+$user->save();
+
+return back()->with('success', 'Correo actualizado correctamente.');
+```
+
+**Responses:**
+- Success: "Correo actualizado correctamente."
+- Error: "La contraseña es incorrecta." (if password verification fails)
+- Validation error: If email is already taken or invalid format
+
+<Warning>
+Password verification is required to update email addresses to prevent unauthorized changes.
+</Warning>
+
+---
+
+### updatePhoto()
+
+Upload or replace the user's profile photo.
+
+**Route:** `PUT /profile/photo`
+
+**Authorization:** Authenticated users (all roles)
+
+**Request Parameters:**
+
+<ParamField path="photo" type="file" required>
+  Image file (JPG, JPEG, or PNG, max 2MB)
+</ParamField>
+
+**Validation Rules:**
+
+```php ProfileController.php:70-72
+$request->validate([
+    'photo' => 'required|image|mimes:jpg,jpeg,png|max:2048',
+]);
+```
+
+**File Storage:**
+
+```php ProfileController.php:74-96
+$user = Auth::user();
+$documento = $user->number_documment;
+
+$folder = public_path('Imagenes_Perfil');
+
+if (!file_exists($folder)) {
+    mkdir($folder, 0755, true);
+}
+
+$extension = $request->file('photo')->getClientOriginalExtension();
+$fileName = 'perfil_' . $documento . '.' . $extension;
+
+// Eliminar fotos anteriores
+foreach (['jpg', 'jpeg', 'png'] as $ext) {
+    $oldFile = $folder . '/perfil_' . $documento . '.' . $ext;
+    if (file_exists($oldFile)) {
+        unlink($oldFile);
+    }
+}
+
+$request->file('photo')->move($folder, $fileName);
+
+return back()->with('success_photo', 'Foto de perfil actualizada correctamente.');
+```
+
+**File Naming:**
+- Format: `perfil_{document_number}.{extension}`
+- Example: `perfil_1234567890.jpg`
+- Storage location: `public/Imagenes_Perfil/`
+
+<Note>
+Uploading a new photo automatically deletes any existing photo for that user (across all supported formats: jpg, jpeg, png).
+</Note>
+
+**Response:**
+- Success: "Foto de perfil actualizada correctamente."
+
+---
+
+### deletePhoto()
+
+Delete the user's profile photo.
+
+**Route:** `DELETE /profile/photo`
+
+**Authorization:** Authenticated users (all roles)
+
+**Logic:**
+
+```php ProfileController.php:100-114
+public function deletePhoto()
+{
+    $user = Auth::user();
+    $documento = $user->number_documment;
+    $folder = public_path('Imagenes_Perfil');
+
+    foreach (['jpg', 'jpeg', 'png'] as $ext) {
+        $file = $folder . '/perfil_' . $documento . '.' . $ext;
+        if (file_exists($file)) {
+            unlink($file);
+        }
+    }
+
+    return back()->with('success_photo', 'Foto de perfil eliminada correctamente.');
+}
+```
+
+**Response:**
+- Success: "Foto de perfil eliminada correctamente."
+
+<Note>
+This method checks and deletes photos in all supported formats (jpg, jpeg, png) to ensure complete removal.
+</Note>
+
+## Usage Examples
+
+### View Profile
+
+```php
+// User navigates to /mi-perfil
+// Controller automatically loads:
+// - User information
+// - Assigned roles
+// - Grade assignments (for psychologists)
+// - Group director assignment (if applicable)
+```
+
+### Update Email
+
+```php
+// Form submission
+$data = [
+    'email' => 'nuevo.correo@bethlemitas.edu.co',
+    'password' => 'current_password'
+];
+
+// PUT /mi-perfil/email
+// Verifies password before updating
+```
+
+### Upload Profile Photo
+
+```php
+// File upload form
+$file = request()->file('photo');
+
+// PUT /profile/photo
+// Stores as: public/Imagenes_Perfil/perfil_{document_number}.jpg
+// Automatically removes old photos
+```
+
+### Delete Profile Photo
+
+```php
+// DELETE /profile/photo
+// Removes all photo files for the user
+```
+
+## Database Tables
+
+- **users_teachers** - User account data
+- **roles** - User role assignments (via Spatie Permission package)
+- **users_load_degree** - Psychologist grade assignments
+- **groups** - Group information for directors
+
+## Related Controllers
+
+<CardGroup cols={2}>
+  <Card title="AuthController" icon="lock" href="/api/controllers/auth-controller">
+    Authentication and password reset
+  </Card>
+  <Card title="CreateController" icon="user-plus" href="/api/controllers/create-controller">
+    User account creation and management
+  </Card>
+</CardGroup>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Authentication Guide" icon="key" href="/guides/authentication">
+    Login, logout, and session management
+  </Card>
+  <Card title="User Management" icon="users" href="/features/user-management">
+    Managing user accounts and roles
+  </Card>
+</CardGroup>
